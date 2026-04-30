@@ -2,6 +2,7 @@
 import os
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import threading
@@ -30,7 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 # Embedded app version for one-file mode
-APP_VERSION = "v1.3.1"
+APP_VERSION = "v1.3.2"
 APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
 APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
@@ -149,6 +150,7 @@ def load_runtime_config() -> dict:
         "ffmpeg_auto_install": True,
         "ffmpeg_bundle_url": FFMPEG_BUNDLE_DEFAULT_URL,
         "min_free_space_mb": 500,
+        "allow_insecure_tls_fallback": True,
         "ui_offset_x": 0,
         "ui_offset_y": 0,
         "ui_debug_hitboxes": False,
@@ -219,6 +221,8 @@ def fetch_latest_release(owner: str, repo: str, timeout_seconds: int = 15) -> Op
 
     req = urllib.request.Request(url, headers=headers)
 
+    allow_insecure = bool(load_runtime_config().get("allow_insecure_tls_fallback", True))
+
     try:
         with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
             raw = response.read().decode("utf-8", errors="replace")
@@ -227,6 +231,17 @@ def fetch_latest_release(owner: str, repo: str, timeout_seconds: int = 15) -> Op
             return data
         return None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        if not allow_insecure:
+            return None
+        try:
+            insecure_ctx = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, timeout=timeout_seconds, context=insecure_ctx) as response:
+                raw = response.read().decode("utf-8", errors="replace")
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                return data
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+            return None
         return None
 
 
@@ -256,26 +271,8 @@ def pick_release_asset_url(release_data: dict, expected_asset_name: str) -> Opti
 
 
 def download_file(url: str, output_path: Path, timeout_seconds: int = 30) -> bool:
-    temp_path = output_path.with_suffix(output_path.suffix + ".tmp")
-
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
-            data = response.read()
-
-        with open(temp_path, "wb") as f:
-            f.write(data)
-
-        os.replace(temp_path, output_path)
-        return True
-
-    except (urllib.error.URLError, TimeoutError, OSError):
-        try:
-            if temp_path.exists():
-                temp_path.unlink()
-        except OSError:
-            pass
-        return False
+    ok, _ = download_file_with_error(url, output_path, timeout_seconds=timeout_seconds)
+    return ok
 
 
 def download_file_with_error(
@@ -294,6 +291,21 @@ def download_file_with_error(
         os.replace(temp_path, output_path)
         return True, ""
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        allow_insecure = bool(load_runtime_config().get("allow_insecure_tls_fallback", True))
+        if allow_insecure:
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                insecure_ctx = ssl._create_unverified_context()
+                with urllib.request.urlopen(req, timeout=timeout_seconds, context=insecure_ctx) as response:
+                    data = response.read()
+
+                with open(temp_path, "wb") as f:
+                    f.write(data)
+
+                os.replace(temp_path, output_path)
+                return True, "insecure_tls_fallback"
+            except (urllib.error.URLError, TimeoutError, OSError):
+                pass
         try:
             if temp_path.exists():
                 temp_path.unlink()
@@ -313,6 +325,8 @@ def download_ytdlp_binary(log: LogFn) -> bool:
             if not ok:
                 log(f"Source failed: {err or 'download error'}")
                 continue
+            if err == "insecure_tls_fallback":
+                log("Warning: SSL verification failed, insecure TLS fallback was used for this source.")
 
             try:
                 extracted = False
@@ -341,6 +355,8 @@ def download_ytdlp_binary(log: LogFn) -> bool:
 
         ok, err = download_file_with_error(url, YTDLP_PATH, timeout_seconds=90)
         if ok:
+            if err == "insecure_tls_fallback":
+                log("Warning: SSL verification failed, insecure TLS fallback was used for this source.")
             return True
         log(f"Source failed: {err or 'download error'}")
 
@@ -351,9 +367,14 @@ def install_ffmpeg_binaries(bundle_url: str, log: LogFn) -> bool:
     zip_path = BASE_DIR / "ffmpeg_bundle.zip"
 
     log("Downloading FFmpeg bundle...")
-    if not download_file(bundle_url, zip_path, timeout_seconds=120):
+    ok, err = download_file_with_error(bundle_url, zip_path, timeout_seconds=120)
+    if not ok:
         log("FFmpeg download failed.")
+        if err:
+            log(f"Reason: {err}")
         return False
+    if err == "insecure_tls_fallback":
+        log("Warning: SSL verification failed, insecure TLS fallback was used for FFmpeg download.")
 
     target_names = {
         "ffmpeg.exe": False,
@@ -695,7 +716,7 @@ class DownloaderWindow(QWidget):
         title.setFont(QFont(ui_font, 34, QFont.Bold))
         header_layout.addWidget(title)
 
-        subtitle = QLabel("Version v1.3.1 · Smart auto-update · One-file friendly", header)
+        subtitle = QLabel("Version v1.3.2 · Smart auto-update · One-file friendly", header)
         subtitle.setObjectName("subtitlePill")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setFont(QFont(ui_font, 12, QFont.DemiBold))

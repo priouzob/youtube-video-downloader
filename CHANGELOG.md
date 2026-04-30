@@ -1,5 +1,11 @@
 ﻿# Changelog
 
+## v1.3.2 - 2026-05-01
+
+- Added SSL fallback mode for VM environments with broken certificate stores
+- Added multiple resilient `yt-dlp.exe` download sources with clearer diagnostics
+- Improved FFmpeg download error reporting for certificate/network failures
+
 ## v1.3.1 - 2026-05-01
 
 - Switched to a clean modern pink Qt interface (no background image dependency)

@@ -34,6 +34,10 @@ The app works without these files, but supports optional overrides:
 - `runtime_config.json`
 - `version.txt`
 
+`runtime_config.json` also supports:
+- `allow_insecure_tls_fallback` (default: `true`)  
+  When a VM has broken/outdated SSL certificates, the app retries downloads with insecure TLS as fallback.
+
 ## Maintainer Release Flow
 
 1. Push code to `master`

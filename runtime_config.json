@@ -1,5 +1,6 @@
 ﻿{
   "ffmpeg_auto_install": true,
   "ffmpeg_bundle_url": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-  "min_free_space_mb": 500
+  "min_free_space_mb": 500,
+  "allow_insecure_tls_fallback": true
 }
