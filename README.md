@@ -1,6 +1,6 @@
 ﻿# YouTube Downloader v2
 
-Portable Windows YouTube downloader powered by `yt-dlp`, with:
+Modern Windows GUI YouTube downloader powered by `yt-dlp`, with:
 - automatic app updates from GitHub Releases
 - automatic `yt-dlp.exe` updates
 - automatic `ffmpeg/ffprobe/ffplay` installation if missing
@@ -10,7 +10,7 @@ Portable Windows YouTube downloader powered by `yt-dlp`, with:
 
 1. Download `downloader_v2.exe` from the latest GitHub Release.
 2. Put it in any folder (for example `C:\YoutubeDownloader`).
-3. Double-click `downloader_v2.exe`.
+3. Double-click `downloader_v2.exe` to open the graphical app.
 4. Paste a YouTube URL.
 
 That's it. One file is enough.
