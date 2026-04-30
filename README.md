@@ -1,94 +1,51 @@
 ﻿# YouTube Downloader v2
 
-Downloader Windows portable base sur `yt-dlp` avec:
-- auto-update de l'application via GitHub Releases
-- auto-update de `yt-dlp.exe`
-- auto-install de `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe` si absents
-- sortie video dans le dossier `video/`
+Portable Windows YouTube downloader powered by `yt-dlp`, with:
+- automatic app updates from GitHub Releases
+- automatic `yt-dlp.exe` updates
+- automatic `ffmpeg/ffprobe/ffplay` installation if missing
+- downloads saved to `video/`
 
-## Utilisation (utilisateur final)
+## Quick Start (End Users)
 
-1. Telecharge la derniere release (`downloader_v2.exe` + fichiers de config).
-2. Mets les fichiers dans un dossier local (ex: `C:\YoutubeDownloader`).
-3. Lance `downloader_v2.exe`.
-4. Colle un lien YouTube quand le programme le demande.
+1. Download `downloader_v2.exe` from the latest GitHub Release.
+2. Put it in any folder (for example `C:\YoutubeDownloader`).
+3. Double-click `downloader_v2.exe`.
+4. Paste a YouTube URL.
 
-Le programme cree le dossier `video/` si besoin.
-Si `ffmpeg` n'est pas present, il est telecharge automatiquement.
+That's it. One file is enough.
 
-## Fichiers minimum a avoir a cote du .exe
+## One-file behavior
 
-- `downloader_v2.exe`
-- `version.txt`
+When users run only `downloader_v2.exe`, the app will:
+- create `video/` automatically
+- download `yt-dlp.exe` if missing
+- download/install `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe` if missing
+- check app updates from GitHub Releases
+
+If your release repo is private, set `YD_GITHUB_TOKEN` in the environment so the app can read private releases.
+
+## Optional local overrides
+
+The app works without these files, but supports optional overrides:
 - `update_config.json`
 - `runtime_config.json`
+- `version.txt`
 
-Optionnel:
-- `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe`
-  - sinon auto-download au premier lancement
+## Maintainer Release Flow
 
-## Auto-update: comment ca marche
-
-### 1) Update de l'application
-Au lancement, l'app lit `update_config.json`:
-- appelle l'API GitHub Releases (latest)
-- compare la version locale (`version.txt`) et le dernier tag
-- si nouvelle version: telecharge le nouvel exe, remplace, redemarre
-
-### 2) Update de yt-dlp
-Au lancement (max 1 fois/jour):
-- verification de la derniere version `yt-dlp.exe`
-- telechargement automatique si necessaire
-
-## Configuration
-
-### `update_config.json`
-Exemple:
-
-```json
-{
-  "enabled": true,
-  "owner": "priouzob",
-  "repo": "youtubedownloader",
-  "asset_name": "downloader_v2.exe",
-  "auto_apply": true,
-  "check_interval": "daily"
-}
-```
-
-### `runtime_config.json`
-Exemple:
-
-```json
-{
-  "ffmpeg_auto_install": true,
-  "ffmpeg_bundle_url": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-  "min_free_space_mb": 500
-}
-```
-
-## Release maintainer
-
-1. Commit/push des changements sur `master`.
-2. Cree un tag semver (ex: `v1.0.1`).
-3. Push du tag.
-4. Le workflow GitHub Actions build l'exe et publie la release.
+1. Push code to `master`
+2. Create a semver tag (example: `v1.0.1`)
+3. Push the tag
+4. GitHub Actions builds and publishes release assets
 
 Workflow: `.github/workflows/release.yml`
 
-## Limite importante GitHub
+## Notes
 
-Les fichiers >100 MiB ne peuvent pas etre pushes dans le repo Git classique.
-Donc `ffmpeg.exe`, `ffplay.exe`, `ffprobe.exe` ne sont pas versionnes ici.
-L'app les recupere automatiquement.
+- GitHub repository files have size limits; large FFmpeg binaries are not committed.
+- Runtime auto-install handles FFmpeg for end users.
 
-## Securite
+## Security
 
-- Voir `SECURITY.md` pour signaler une faille.
-- Ne jamais partager de token/secret dans les issues.
-
-## Roadmap courte
-
-- checksum SHA256 des assets release
-- signature code Windows
-- logs optionnels (mode debug)
+See `SECURITY.md`.

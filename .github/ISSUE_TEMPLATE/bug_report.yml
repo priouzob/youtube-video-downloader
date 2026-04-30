@@ -1,34 +1,33 @@
 ﻿name: Bug report
-description: Signaler un bug sur l'application
+description: Report a reproducible bug
 labels: [bug]
 body:
   - type: textarea
     id: bug
     attributes:
-      label: Description
-      description: Decris le bug observe
+      label: What happened?
+      description: Describe the observed behavior.
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Liste les etapes pour reproduire
       placeholder: |
-        1. Lancer ...
-        2. Coller URL ...
-        3. Voir erreur ...
+        1. Launch app
+        2. Paste URL
+        3. Observe error
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: Version
-      placeholder: v1.0.0
+      label: App version
+      placeholder: v1.0.1
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: Logs/erreur
-      description: Colle le message console complet
+      label: Console logs
+      description: Paste full console output.

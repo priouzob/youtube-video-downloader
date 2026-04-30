@@ -1,10 +1,16 @@
 ﻿# Changelog
 
+## v1.0.1 - 2026-04-30
+
+- Switched all CLI/runtime messages to English
+- One-file first experience improved (`downloader_v2.exe` works standalone)
+- Embedded default app update config for `priouzob/youtubedownloader`
+- Optional config files kept only as overrides
+
 ## v1.0.0 - 2026-04-30
 
-- Auto-update de l'application via GitHub Releases
-- Auto-update de `yt-dlp.exe` (check daily)
-- Auto-install de FFmpeg si binaire absent
-- Verification de l'espace disque minimal
-- Workflow GitHub Actions de build/release sur tag `v*.*.*`
-- Pack `release_portable` pret a distribuer
+- App auto-update via GitHub Releases
+- `yt-dlp.exe` auto-update (daily check)
+- FFmpeg auto-install if binaries are missing
+- Free disk space check before downloads
+- GitHub Actions release workflow (`v*.*.*` tags)

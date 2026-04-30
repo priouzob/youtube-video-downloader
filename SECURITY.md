@@ -2,14 +2,15 @@
 
 ## Supported Versions
 
-Seule la derniere version taggee est supportee pour les correctifs securite.
+Only the latest tagged version is supported for security fixes.
 
-## Report a Vulnerability
+## Reporting a Vulnerability
 
-Pour signaler une faille:
+Please do not open public security issues.
 
-- ne pas ouvrir d'issue publique
-- contacter le maintainer en message prive GitHub
-- inclure: impact, etapes de reproduction, version
+Report privately via GitHub direct contact to the maintainer and include:
+- affected version
+- impact
+- reproduction steps
 
-Objectif de premiere reponse: 72h.
+Initial response target: 72 hours.

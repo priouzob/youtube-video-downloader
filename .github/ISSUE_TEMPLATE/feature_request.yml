@@ -1,18 +1,18 @@
 ﻿name: Feature request
-description: Proposer une amelioration
+description: Suggest an improvement
 labels: [enhancement]
 body:
   - type: textarea
-    id: need
+    id: problem
     attributes:
-      label: Besoin
-      description: Quel probleme veux-tu resoudre
+      label: Problem to solve
+      description: What pain point are you trying to solve?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposition
-      description: Quelle solution proposes-tu
+      label: Proposed solution
+      description: What should be added or changed?
     validations:
       required: true

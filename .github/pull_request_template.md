@@ -8,11 +8,11 @@
 
 ## Test plan
 
-- [ ] Build local OK
-- [ ] Run exe OK
-- [ ] Auto-update path tested (if impacted)
+- [ ] Local build succeeds
+- [ ] EXE starts correctly
+- [ ] Update path tested (if impacted)
 
 ## Checklist
 
 - [ ] No secrets added
-- [ ] Docs updated (README/CHANGELOG)
+- [ ] Docs updated

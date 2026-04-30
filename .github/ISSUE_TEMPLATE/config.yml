@@ -2,4 +2,4 @@
 contact_links:
   - name: Security report
     url: https://github.com/priouzob
-    about: Reporte une faille en prive, pas en issue publique.
+    about: For vulnerabilities, report privately.

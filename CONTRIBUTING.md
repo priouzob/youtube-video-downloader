@@ -1,30 +1,31 @@
 ﻿# Contributing
 
-Merci de contribuer.
+Thanks for contributing.
 
-## Setup local
+## Local setup
 
-1. Installer Python 3.12+
-2. Installer PyInstaller:
+1. Install Python 3.12+
+2. Install PyInstaller:
 
 ```powershell
 python -m pip install pyinstaller
 ```
 
-3. Build local:
+3. Build locally:
 
 ```powershell
 python -m PyInstaller downloader_v2.spec
 ```
 
-## Regles
+## Guidelines
 
-- Pas de secrets dans le repo
-- Garder les changements petits et lisibles
-- Tester le lancement de l'exe avant PR
+- Keep changes focused and testable
+- Never commit secrets
+- Test executable startup before opening a PR
 
-## Pull request
+## Pull requests
 
-- Decrire le probleme
-- Decrire la solution
-- Ajouter les etapes de test
+Please include:
+- problem summary
+- implementation summary
+- test steps and expected results

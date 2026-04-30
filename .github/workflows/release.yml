@@ -24,12 +24,6 @@ jobs:
       - name: Install PyInstaller
         run: python -m pip install --upgrade pip pyinstaller
 
-      - name: Set version file from tag
-        shell: pwsh
-        run: |
-          $tag = "${{ github.ref_name }}"
-          Set-Content -Path version.txt -Value $tag -Encoding UTF8
-
       - name: Build EXE
         run: python -m PyInstaller downloader_v2.spec
 
@@ -38,14 +32,10 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release_assets | Out-Null
           Copy-Item dist/downloader_v2.exe release_assets/downloader_v2.exe
-          Copy-Item version.txt release_assets/version.txt
-          Copy-Item update_config.json release_assets/update_config.json
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release_assets/downloader_v2.exe
-            release_assets/version.txt
-            release_assets/update_config.json
           generate_release_notes: true

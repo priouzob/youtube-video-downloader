@@ -11,18 +11,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-# ----- App versioning -----
-APP_VERSION_FALLBACK = "1.0.0"
-APP_VERSION_FILE = "version.txt"
+# Embedded app version for one-file mode
+APP_VERSION = "v1.0.1"
+APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
-APP_UPDATE_CONFIG_FILE = "update_config.json"
+APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
 APP_UPDATE_SCRIPT_FILE = "_apply_update.bat"
 
-# ----- Runtime config -----
-RUNTIME_CONFIG_FILE = "runtime_config.json"
+RUNTIME_CONFIG_FILE = "runtime_config.json"  # optional override
 FFMPEG_BUNDLE_DEFAULT_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
 
-# ----- yt-dlp auto update -----
 YTDLP_LATEST_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 YTDLP_EXE_NAME = "yt-dlp.exe"
 YTDLP_UPDATE_STAMP_FILE = ".ytdlp-last-update.txt"
@@ -49,22 +47,16 @@ def ensure_video_dir() -> None:
     VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def ensure_app_version_file() -> None:
-    if APP_VERSION_PATH.exists():
-        return
+def read_local_app_version() -> str:
+    # One-file mode: if version.txt is missing, use embedded version.
     try:
-        APP_VERSION_PATH.write_text(APP_VERSION_FALLBACK, encoding="utf-8")
+        if APP_VERSION_PATH.exists():
+            value = APP_VERSION_PATH.read_text(encoding="utf-8").strip()
+            if value:
+                return value
     except OSError:
         pass
-
-
-def read_local_app_version() -> str:
-    ensure_app_version_file()
-    try:
-        value = APP_VERSION_PATH.read_text(encoding="utf-8").strip()
-        return value or APP_VERSION_FALLBACK
-    except OSError:
-        return APP_VERSION_FALLBACK
+    return APP_VERSION
 
 
 def binary_exists(filename: str) -> bool:
@@ -92,82 +84,42 @@ def mark_update_checked_today(stamp_path: Path) -> None:
         pass
 
 
-def write_default_runtime_config_if_missing() -> None:
-    if RUNTIME_CONFIG_PATH.exists():
-        return
-
-    template = {
-        "ffmpeg_auto_install": True,
-        "ffmpeg_bundle_url": FFMPEG_BUNDLE_DEFAULT_URL,
-        "min_free_space_mb": 500,
-    }
-
-    try:
-        RUNTIME_CONFIG_PATH.write_text(
-            json.dumps(template, ensure_ascii=True, indent=2),
-            encoding="utf-8",
-        )
-    except OSError:
-        pass
-
-
 def load_runtime_config() -> dict:
-    write_default_runtime_config_if_missing()
-
     defaults = {
         "ffmpeg_auto_install": True,
         "ffmpeg_bundle_url": FFMPEG_BUNDLE_DEFAULT_URL,
         "min_free_space_mb": 500,
     }
 
+    # Optional file-based override.
     try:
-        data = json.loads(RUNTIME_CONFIG_PATH.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            defaults.update(data)
+        if RUNTIME_CONFIG_PATH.exists():
+            data = json.loads(RUNTIME_CONFIG_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                defaults.update(data)
     except (OSError, json.JSONDecodeError):
         pass
 
     return defaults
 
 
-def write_default_update_config_if_missing() -> None:
-    if APP_UPDATE_CONFIG_PATH.exists():
-        return
-
-    template = {
-        "enabled": False,
-        "owner": "REPLACE_WITH_GITHUB_OWNER",
-        "repo": "REPLACE_WITH_REPO_NAME",
-        "asset_name": "downloader_v2.exe",
-        "auto_apply": True,
-        "check_interval": "daily",
-    }
-
-    try:
-        APP_UPDATE_CONFIG_PATH.write_text(
-            json.dumps(template, ensure_ascii=True, indent=2),
-            encoding="utf-8",
-        )
-    except OSError:
-        pass
-
-
 def load_update_config() -> dict:
-    write_default_update_config_if_missing()
-
+    # Preconfigured defaults for your private repo.
     defaults = {
-        "enabled": False,
-        "owner": "",
-        "repo": "",
+        "enabled": True,
+        "owner": "priouzob",
+        "repo": "youtubedownloader",
         "asset_name": "downloader_v2.exe",
         "auto_apply": True,
         "check_interval": "daily",
     }
 
+    # Optional file-based override.
     try:
-        data = json.loads(APP_UPDATE_CONFIG_PATH.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            defaults.update(data)
+        if APP_UPDATE_CONFIG_PATH.exists():
+            data = json.loads(APP_UPDATE_CONFIG_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                defaults.update(data)
     except (OSError, json.JSONDecodeError):
         pass
 
@@ -194,12 +146,17 @@ def is_version_newer(remote: str, local: str) -> bool:
 
 def fetch_latest_release(owner: str, repo: str, timeout_seconds: int = 15) -> Optional[dict]:
     url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "youtube-downloader-updater",
+    }
+    token = os.getenv("YD_GITHUB_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     req = urllib.request.Request(
         url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "youtube-downloader-updater",
-        },
+        headers=headers,
     )
 
     try:
@@ -264,9 +221,9 @@ def download_file(url: str, output_path: Path, timeout_seconds: int = 30) -> boo
 def install_ffmpeg_binaries(bundle_url: str) -> bool:
     zip_path = BASE_DIR / "ffmpeg_bundle.zip"
 
-    print("Telechargement du pack FFmpeg...")
+    print("Downloading FFmpeg bundle...")
     if not download_file(bundle_url, zip_path, timeout_seconds=120):
-        print("Echec du telechargement FFmpeg.")
+        print("FFmpeg download failed.")
         return False
 
     target_names = {
@@ -287,7 +244,7 @@ def install_ffmpeg_binaries(bundle_url: str) -> bool:
                         shutil.copyfileobj(src, dst)
                     target_names[name] = True
     except (OSError, zipfile.BadZipFile):
-        print("Archive FFmpeg invalide ou corrompue.")
+        print("Invalid or corrupted FFmpeg archive.")
         return False
     finally:
         try:
@@ -297,10 +254,10 @@ def install_ffmpeg_binaries(bundle_url: str) -> bool:
             pass
 
     if all(target_names.values()):
-        print("FFmpeg installe automatiquement.")
+        print("FFmpeg installed automatically.")
         return True
 
-    print("Installation FFmpeg incomplete.")
+    print("FFmpeg installation incomplete.")
     return False
 
 
@@ -309,18 +266,18 @@ def ensure_ffmpeg_ready(runtime_cfg: dict) -> None:
     missing = [name for name in needed if not binary_exists(name)]
 
     if not missing:
-        print("FFmpeg OK: ffmpeg/ffprobe/ffplay detectes.")
+        print("FFmpeg OK: ffmpeg/ffprobe/ffplay found.")
         return
 
-    print("Attention: fichiers FFmpeg manquants -> " + ", ".join(missing))
+    print("Missing FFmpeg binaries: " + ", ".join(missing))
 
     if not bool(runtime_cfg.get("ffmpeg_auto_install", True)):
-        print("Auto-install FFmpeg desactive dans runtime_config.json.")
+        print("FFmpeg auto-install is disabled.")
         return
 
     bundle_url = str(runtime_cfg.get("ffmpeg_bundle_url", FFMPEG_BUNDLE_DEFAULT_URL)).strip()
     if not bundle_url:
-        print("URL de FFmpeg manquante dans runtime_config.json.")
+        print("FFmpeg bundle URL is missing.")
         return
 
     install_ffmpeg_binaries(bundle_url)
@@ -338,19 +295,19 @@ def check_free_space(runtime_cfg: dict) -> None:
     min_free_mb = int(runtime_cfg.get("min_free_space_mb", 500))
     free_mb = get_free_space_mb(VIDEO_DIR)
     if free_mb < 0:
-        print("Espace disque: impossible de lire l'espace libre.")
+        print("Disk check: unable to read free space.")
         return
 
     if free_mb < min_free_mb:
-        print(f"Attention: espace disque faible ({free_mb} MB libres).")
-        print("Change de disque/dossier ou libere de la place avant de gros telechargements.")
+        print(f"Warning: low disk space ({free_mb} MB free).")
+        print("Free up space before large downloads.")
     else:
-        print(f"Espace disque OK: {free_mb} MB libres.")
+        print(f"Disk space OK: {free_mb} MB free.")
 
 
 def prepare_and_launch_self_update(new_tag: str, asset_url: str) -> bool:
     if not getattr(sys, "frozen", False):
-        print("Auto-update app ignore en mode script (non compile).")
+        print("App self-update skipped in script mode.")
         return False
 
     current_exe = Path(sys.executable).name
@@ -359,7 +316,7 @@ def prepare_and_launch_self_update(new_tag: str, asset_url: str) -> bool:
 
     ok = download_file(asset_url, new_exe_path)
     if not ok:
-        print("Echec telechargement du nouvel executable.")
+        print("Failed to download updated executable.")
         return False
 
     try:
@@ -380,7 +337,7 @@ for /l %%i in (1,1,20) do (
   timeout /t 1 /nobreak >nul
 )
 
-echo Update non applique (fichier verrouille).
+echo Update could not be applied (file lock).
 exit /b 1
 
 :replaced
@@ -396,7 +353,7 @@ exit /b 0
     try:
         APP_UPDATE_SCRIPT_PATH.write_text(script, encoding="utf-8")
     except OSError:
-        print("Echec creation du script d'update.")
+        print("Failed to create update script.")
         return False
 
     try:
@@ -411,7 +368,7 @@ exit /b 0
         )
         return True
     except OSError:
-        print("Echec lancement du script d'update.")
+        print("Failed to launch update script.")
         return False
 
 
@@ -419,60 +376,55 @@ def ensure_app_is_fresh() -> bool:
     cfg = load_update_config()
 
     if not cfg.get("enabled", False):
-        print("Auto-update app: desactive (update_config.json).")
+        print("App auto-update: disabled.")
         return False
 
     owner = str(cfg.get("owner", "")).strip()
     repo = str(cfg.get("repo", "")).strip()
-    if (
-        not owner
-        or not repo
-        or owner.startswith("REPLACE_")
-        or repo.startswith("REPLACE_")
-    ):
-        print("Auto-update app: owner/repo non configures.")
+    if not owner or not repo:
+        print("App auto-update: owner/repo not configured.")
         return False
 
     interval = str(cfg.get("check_interval", "daily")).lower().strip()
     if interval == "daily" and (not should_check_update_today(APP_UPDATE_STAMP_PATH)):
-        print("Auto-update app: verification deja faite aujourd'hui.")
+        print("App auto-update: already checked today.")
         return False
 
-    print("Verification des mises a jour de l'application...")
+    print("Checking for app updates...")
     release = fetch_latest_release(owner, repo)
     mark_update_checked_today(APP_UPDATE_STAMP_PATH)
 
     if not release:
-        print("Auto-update app: impossible de lire la derniere release.")
+        print("App auto-update: could not read latest release.")
         return False
 
     remote_tag = str(release.get("tag_name", "")).strip()
     if not remote_tag:
-        print("Auto-update app: tag release introuvable.")
+        print("App auto-update: release tag not found.")
         return False
 
     local_version = read_local_app_version()
     if not is_version_newer(remote_tag, local_version):
-        print(f"Application a jour ({local_version}).")
+        print(f"App is up to date ({local_version}).")
         return False
 
     asset_name = str(cfg.get("asset_name", "downloader_v2.exe")).strip() or "downloader_v2.exe"
     asset_url = pick_release_asset_url(release, asset_name)
     if not asset_url:
-        print(f"Auto-update app: asset '{asset_name}' introuvable dans la release.")
+        print(f"App auto-update: asset '{asset_name}' not found in release.")
         return False
 
-    print(f"Nouvelle version detectee: {remote_tag} (locale: {local_version}).")
+    print(f"New version found: {remote_tag} (local: {local_version}).")
 
     auto_apply = bool(cfg.get("auto_apply", True))
     if not auto_apply:
-        answer = input("Appliquer la mise a jour maintenant ? (o/n) : ").strip().lower()
-        if answer != "o":
-            print("Mise a jour reportee.")
+        answer = input("Apply update now? (y/n): ").strip().lower()
+        if answer != "y":
+            print("Update skipped.")
             return False
 
     if prepare_and_launch_self_update(remote_tag, asset_url):
-        print("Mise a jour telechargee. Redemarrage de l'application...")
+        print("Update downloaded. Restarting application...")
         return True
 
     return False
@@ -480,26 +432,26 @@ def ensure_app_is_fresh() -> bool:
 
 def ensure_ytdlp_is_fresh() -> None:
     if not YTDLP_PATH.exists():
-        print("yt-dlp.exe absent -> telechargement...")
+        print("yt-dlp.exe not found, downloading...")
         ok = download_file(YTDLP_LATEST_URL, YTDLP_PATH)
         mark_update_checked_today(YTDLP_UPDATE_STAMP_PATH)
         if ok:
-            print("yt-dlp.exe telecharge avec succes.")
+            print("yt-dlp.exe downloaded successfully.")
         else:
-            print("Impossible de telecharger yt-dlp.exe pour le moment.")
+            print("Could not download yt-dlp.exe right now.")
         return
 
     if not should_check_update_today(YTDLP_UPDATE_STAMP_PATH):
-        print("yt-dlp: verification deja faite aujourd'hui.")
+        print("yt-dlp: already checked today.")
         return
 
-    print("Verification des mises a jour yt-dlp...")
+    print("Checking yt-dlp updates...")
     ok = download_file(YTDLP_LATEST_URL, YTDLP_PATH)
     mark_update_checked_today(YTDLP_UPDATE_STAMP_PATH)
     if ok:
-        print("yt-dlp est a jour.")
+        print("yt-dlp is up to date.")
     else:
-        print("Conservation de la version locale de yt-dlp.")
+        print("Keeping local yt-dlp version.")
 
 
 def run_download(url: str) -> int:
@@ -520,8 +472,9 @@ def run_download(url: str) -> int:
 
 
 def run_bot() -> bool:
-    print("=== MON YOUTUBE DOWNLOADER V2 ===")
-    print(f"Dossier de sortie: {VIDEO_DIR}")
+    print("=== YOUTUBE DOWNLOADER V2 ===")
+    print(f"Version: {APP_VERSION}")
+    print(f"Output folder: {VIDEO_DIR}")
 
     ensure_video_dir()
     runtime_cfg = load_runtime_config()
@@ -535,22 +488,22 @@ def run_bot() -> bool:
     ensure_ytdlp_is_fresh()
 
     if not YTDLP_PATH.exists():
-        print("Erreur: yt-dlp.exe introuvable, impossible de continuer.")
+        print("Error: yt-dlp.exe is missing, cannot continue.")
         return True
 
-    url = input("\nColle le lien de la video YouTube ici (puis appuie sur Entree) : ").strip()
+    url = input("\nPaste a YouTube URL and press Enter: ").strip()
     if not url:
-        print("Erreur: tu n'as pas entre de lien.")
+        print("Error: no URL provided.")
         return True
 
-    print("\nTelechargement en cours...")
+    print("\nDownloading...")
     code = run_download(url)
 
     print("\n" + "=" * 30)
     if code == 0:
-        print(f"SUCCES: La video est dans '{VIDEO_DIR}'")
+        print(f"SUCCESS: Video saved to '{VIDEO_DIR}'")
     else:
-        print(f"ECHEC: yt-dlp a retourne le code {code}")
+        print(f"FAILED: yt-dlp returned exit code {code}")
     print("=" * 30)
     return True
 
@@ -561,7 +514,7 @@ if __name__ == "__main__":
         if not keep_running:
             sys.exit(0)
 
-        choix = input("\nVeux-tu telecharger une autre video ? (o/n) : ").lower().strip()
-        if choix != "o":
-            print("Au revoir !")
+        choice = input("\nDownload another video? (y/n): ").lower().strip()
+        if choice != "y":
+            print("Goodbye!")
             break
