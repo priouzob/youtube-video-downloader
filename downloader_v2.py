@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 # Embedded app version for one-file mode
-APP_VERSION = "v1.3.0"
+APP_VERSION = "v1.3.1"
 APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
 APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
@@ -695,7 +695,7 @@ class DownloaderWindow(QWidget):
         title.setFont(QFont(ui_font, 34, QFont.Bold))
         header_layout.addWidget(title)
 
-        subtitle = QLabel("Version v1.3.0 · Smart auto-update · One-file friendly", header)
+        subtitle = QLabel("Version v1.3.1 · Smart auto-update · One-file friendly", header)
         subtitle.setObjectName("subtitlePill")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setFont(QFont(ui_font, 12, QFont.DemiBold))

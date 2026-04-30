@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## v1.3.1 - 2026-05-01
+
+- Switched to a clean modern pink Qt interface (no background image dependency)
+- Improved first-run behavior on fresh machines/VMs (buttons remain usable)
+- Added resilient `yt-dlp.exe` download fallbacks and clearer network error logs
+- Updated public-repo docs for GitHub Releases auto-update flow
+
 ## v1.3.0 - 2026-04-30
 
 - Migrated UI from Tk/CustomTkinter to PySide6 (Qt)
