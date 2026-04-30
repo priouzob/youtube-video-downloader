@@ -1,0 +1,26 @@
+﻿# Python cache
+__pycache__/
+*.pyc
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Runtime files
+*.tmp
+_apply_update.bat
+.ytdlp-last-update.txt
+.app-last-update-check.txt
+version.new.txt
+
+# Output videos
+video/
+release_portable/video/
+
+# Large local binaries (do not commit to GitHub directly)
+ffmpeg.exe
+ffplay.exe
+ffprobe.exe
+yt-dlp.exe
+release_portable/
