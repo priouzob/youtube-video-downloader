@@ -31,11 +31,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release_assets | Out-Null
-          Copy-Item dist/downloader_v2.exe release_assets/downloader_v2.exe
+          Copy-Item dist/youtube-video-downloader.exe release_assets/youtube-video-downloader.exe
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release_assets/downloader_v2.exe
+            release_assets/youtube-video-downloader.exe
           generate_release_notes: true

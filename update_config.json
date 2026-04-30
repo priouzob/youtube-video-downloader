@@ -1,8 +1,8 @@
 ﻿{
   "enabled": true,
   "owner": "priouzob",
-  "repo": "youtubedownloader",
-  "asset_name": "downloader_v2.exe",
+  "repo": "youtube-video-downloader",
+  "asset_name": "youtube-video-downloader.exe",
   "auto_apply": true,
   "check_interval": "daily"
 }

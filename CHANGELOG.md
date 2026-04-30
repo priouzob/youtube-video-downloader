@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## v1.2.0 - 2026-04-30
+
+- Renamed executable to `youtube-video-downloader.exe`
+- Added custom pink theme and integrated background image in the GUI
+- Embedded background/image assets into the executable bundle
+- Updated release workflow to publish `youtube-video-downloader.exe`
+
 ## v1.1.0 - 2026-04-30
 
 - Replaced console flow with a modern graphical interface

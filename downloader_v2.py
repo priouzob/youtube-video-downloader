@@ -16,9 +16,10 @@ from typing import Callable, Optional
 import tkinter as tk
 from tkinter import messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
+from PIL import Image, ImageEnhance, ImageTk
 
 # Embedded app version for one-file mode
-APP_VERSION = "v1.1.0"
+APP_VERSION = "v1.2.0"
 APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
 APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
@@ -50,6 +51,12 @@ APP_UPDATE_STAMP_PATH = BASE_DIR / APP_UPDATE_STAMP_FILE
 APP_UPDATE_CONFIG_PATH = BASE_DIR / APP_UPDATE_CONFIG_FILE
 APP_UPDATE_SCRIPT_PATH = BASE_DIR / APP_UPDATE_SCRIPT_FILE
 RUNTIME_CONFIG_PATH = BASE_DIR / RUNTIME_CONFIG_FILE
+
+
+def get_resource_path(relative_path: str) -> Path:
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(getattr(sys, "_MEIPASS")) / relative_path
+    return BASE_DIR / relative_path
 
 
 def ensure_video_dir() -> None:
@@ -117,8 +124,8 @@ def load_update_config() -> dict:
     defaults = {
         "enabled": True,
         "owner": "priouzob",
-        "repo": "youtubedownloader",
-        "asset_name": "downloader_v2.exe",
+        "repo": "youtube-video-downloader",
+        "asset_name": "youtube-video-downloader.exe",
         "auto_apply": True,
         "check_interval": "daily",
     }
@@ -502,11 +509,12 @@ def run_download(url: str, log: LogFn, set_progress: ProgressFn) -> int:
 class DownloaderApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title("YouTube Downloader V2")
+        self.root.title("YouTube Video Downloader")
         self.root.geometry("980x680")
         self.root.minsize(860, 600)
-        self.root.configure(bg="#111827")
+        self.root.configure(bg="#0b1020")
         self._apply_window_icon()
+        self._setup_background()
 
         self.log_queue: Queue[str] = Queue()
         self.progress_queue: Queue[float] = Queue()
@@ -522,15 +530,49 @@ class DownloaderApp:
 
         self.root.after(120, self._flush_queues)
         self.root.after(250, self._bootstrap_async)
+        self.root.bind("<Configure>", self._on_root_resize)
 
     def _apply_window_icon(self) -> None:
-        icon_path = BASE_DIR / "app_icon.ico"
+        icon_path = get_resource_path("app_icon.ico")
         if not icon_path.exists():
             return
         try:
             self.root.iconbitmap(default=str(icon_path))
         except Exception:
             pass
+
+    def _setup_background(self) -> None:
+        self.bg_label = tk.Label(self.root, bd=0, highlightthickness=0)
+        self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+        self.bg_original: Optional[Image.Image] = None
+        self.bg_photo: Optional[ImageTk.PhotoImage] = None
+
+        bg_path = get_resource_path("assets/makima_bg.jpg")
+        if not bg_path.exists():
+            return
+
+        try:
+            raw = Image.open(bg_path).convert("RGBA")
+            # Pink cinematic overlay and a slight darkening for UI contrast.
+            overlay = Image.new("RGBA", raw.size, (236, 72, 153, 85))
+            mixed = Image.alpha_composite(raw, overlay)
+            mixed = ImageEnhance.Brightness(mixed).enhance(0.65)
+            self.bg_original = mixed
+        except Exception:
+            self.bg_original = None
+
+    def _refresh_background(self, width: int, height: int) -> None:
+        if self.bg_original is None or width < 2 or height < 2:
+            return
+        try:
+            resized = self.bg_original.resize((width, height), Image.Resampling.LANCZOS)
+            self.bg_photo = ImageTk.PhotoImage(resized)
+            self.bg_label.configure(image=self.bg_photo)
+        except Exception:
+            pass
+
+    def _on_root_resize(self, _event: tk.Event) -> None:
+        self._refresh_background(self.root.winfo_width(), self.root.winfo_height())
 
     def _build_style(self) -> None:
         style = ttk.Style(self.root)
@@ -542,17 +584,17 @@ class DownloaderApp:
         style.configure(
             "Accent.TButton",
             foreground="#ffffff",
-            background="#2563eb",
+            background="#db2777",
             borderwidth=0,
             focusthickness=0,
-            focuscolor="#2563eb",
+            focuscolor="#db2777",
             padding=(14, 10),
             font=("Segoe UI", 10, "bold"),
         )
         style.map(
             "Accent.TButton",
-            background=[("active", "#1d4ed8"), ("disabled", "#334155")],
-            foreground=[("disabled", "#94a3b8")],
+            background=[("active", "#be185d"), ("disabled", "#4b1d35")],
+            foreground=[("disabled", "#f5d0e6")],
         )
 
         style.configure(
@@ -573,22 +615,22 @@ class DownloaderApp:
             "Modern.Horizontal.TProgressbar",
             troughcolor="#1f2937",
             bordercolor="#1f2937",
-            background="#22c55e",
-            lightcolor="#22c55e",
-            darkcolor="#22c55e",
+            background="#ec4899",
+            lightcolor="#ec4899",
+            darkcolor="#ec4899",
         )
 
     def _build_ui(self) -> None:
         root = self.root
 
-        header = tk.Frame(root, bg="#0f172a", height=96)
+        header = tk.Frame(root, bg="#12081f", height=96)
         header.pack(fill="x")
         header.pack_propagate(False)
 
         tk.Label(
             header,
-            text="YouTube Downloader V2",
-            bg="#0f172a",
+            text="YouTube Video Downloader",
+            bg="#12081f",
             fg="#f8fafc",
             font=("Segoe UI Semibold", 22),
         ).pack(anchor="w", padx=20, pady=(18, 0))
@@ -596,12 +638,12 @@ class DownloaderApp:
         tk.Label(
             header,
             text=f"Version {APP_VERSION} - Smart auto-update, one-file friendly",
-            bg="#0f172a",
-            fg="#93c5fd",
+            bg="#12081f",
+            fg="#f9a8d4",
             font=("Segoe UI", 10),
         ).pack(anchor="w", padx=22, pady=(4, 14))
 
-        body = tk.Frame(root, bg="#111827")
+        body = tk.Frame(root, bg="#0f0a1a")
         body.pack(fill="both", expand=True, padx=18, pady=16)
 
         url_card = tk.Frame(body, bg="#1f2937", bd=0, highlightthickness=1, highlightbackground="#374151")
@@ -636,7 +678,7 @@ class DownloaderApp:
         self.download_btn = ttk.Button(entry_row, text="Download", style="Accent.TButton", command=self.on_download)
         self.download_btn.pack(side="left", padx=(10, 0))
 
-        actions = tk.Frame(body, bg="#111827")
+        actions = tk.Frame(body, bg="#0f0a1a")
         actions.pack(fill="x", pady=(12, 8))
 
         self.open_folder_btn = ttk.Button(actions, text="Open Video Folder", style="Subtle.TButton", command=self.open_video_folder)
@@ -648,12 +690,12 @@ class DownloaderApp:
         tk.Label(
             actions,
             textvariable=self.status_var,
-            bg="#111827",
-            fg="#93c5fd",
+            bg="#0f0a1a",
+            fg="#f9a8d4",
             font=("Segoe UI", 10),
         ).pack(side="right")
 
-        progress_wrap = tk.Frame(body, bg="#111827")
+        progress_wrap = tk.Frame(body, bg="#0f0a1a")
         progress_wrap.pack(fill="x", pady=(0, 10))
 
         self.progress = ttk.Progressbar(
@@ -694,8 +736,8 @@ class DownloaderApp:
         footer = tk.Label(
             root,
             text="Tip: If your release is private, set environment variable YD_GITHUB_TOKEN.",
-            bg="#111827",
-            fg="#6b7280",
+            bg="#0f0a1a",
+            fg="#c4b5fd",
             font=("Segoe UI", 9),
         )
         footer.pack(fill="x", padx=18, pady=(0, 10), anchor="w")
