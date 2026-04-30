@@ -18,7 +18,7 @@ from PIL import Image, ImageEnhance, ImageTk
 import customtkinter as ctk
 
 # Embedded app version for one-file mode
-APP_VERSION = "v1.2.1"
+APP_VERSION = "v1.2.3"
 APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
 APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
@@ -573,7 +573,7 @@ class DownloaderApp:
             self.main,
             text="YouTube Video Downloader",
             text_color="#a43f63",
-            font=ctk.CTkFont(family="Times New Roman", size=54, weight="bold"),
+            font=ctk.CTkFont(family="Times New Roman", size=34, weight="bold"),
         )
         title.pack(pady=(14, 2))
 
@@ -591,9 +591,9 @@ class DownloaderApp:
 
         ctk.CTkLabel(
             subtitle_wrap,
-            text=f"Version {APP_VERSION} ? Smart auto-update ? one-file friendly",
+            text=f"Version {APP_VERSION} · Smart auto-update · one-file friendly",
             text_color="#fff3f8",
-            font=ctk.CTkFont(family="Georgia", size=16),
+            font=ctk.CTkFont(family="Georgia", size=14),
         ).pack(expand=True)
 
         content = ctk.CTkFrame(self.main, fg_color="transparent")
@@ -626,9 +626,9 @@ class DownloaderApp:
 
         ctk.CTkLabel(
             url_card,
-            text="?  YouTube URL",
+            text="YouTube URL",
             text_color="#a34c6f",
-            font=ctk.CTkFont(family="Georgia", size=34, weight="bold"),
+            font=ctk.CTkFont(family="Georgia", size=24, weight="bold"),
         ).pack(anchor="w", padx=22, pady=(14, 8))
 
         row = ctk.CTkFrame(url_card, fg_color="transparent")
@@ -644,7 +644,7 @@ class DownloaderApp:
             placeholder_text_color="#bb7d99",
             corner_radius=16,
             height=54,
-            font=ctk.CTkFont(family="Georgia", size=23),
+            font=ctk.CTkFont(family="Georgia", size=16),
         )
         self.url_entry.pack(side="left", fill="x", expand=True, padx=(0, 12))
         self.url_entry.bind("<Return>", lambda _e: self.on_download())
@@ -659,7 +659,7 @@ class DownloaderApp:
             border_width=2,
             border_color="#cf5f8b",
             text_color="#fff7fb",
-            font=ctk.CTkFont(family="Georgia", size=31, weight="bold"),
+            font=ctk.CTkFont(family="Georgia", size=17, weight="bold"),
             width=250,
             height=54,
         )
@@ -670,7 +670,7 @@ class DownloaderApp:
 
         self.open_folder_btn = ctk.CTkButton(
             actions,
-            text="? Open Video Folder",
+            text="Open Video Folder",
             command=self.open_video_folder,
             corner_radius=16,
             fg_color="#f7d2e1",
@@ -678,7 +678,7 @@ class DownloaderApp:
             border_width=2,
             border_color="#d893af",
             text_color="#8d3559",
-            font=ctk.CTkFont(family="Georgia", size=30, weight="bold"),
+            font=ctk.CTkFont(family="Georgia", size=16, weight="bold"),
             width=270,
             height=54,
         )
@@ -686,7 +686,7 @@ class DownloaderApp:
 
         self.check_updates_btn = ctk.CTkButton(
             actions,
-            text="? Check Updates",
+            text="Check Updates",
             command=self.check_updates_now,
             corner_radius=16,
             fg_color="#f7d2e1",
@@ -694,7 +694,7 @@ class DownloaderApp:
             border_width=2,
             border_color="#d893af",
             text_color="#8d3559",
-            font=ctk.CTkFont(family="Georgia", size=30, weight="bold"),
+            font=ctk.CTkFont(family="Georgia", size=16, weight="bold"),
             width=250,
             height=54,
         )
@@ -704,7 +704,7 @@ class DownloaderApp:
             actions,
             textvariable=self.status_var,
             text_color="#b24f74",
-            font=ctk.CTkFont(family="Georgia", size=37, weight="bold"),
+            font=ctk.CTkFont(family="Georgia", size=18, weight="bold"),
         ).pack(side="right", padx=(8, 4))
 
         progress_wrap = ctk.CTkFrame(left, fg_color="transparent")
@@ -731,9 +731,9 @@ class DownloaderApp:
 
         ctk.CTkLabel(
             logs_card,
-            text="?  Live Logs",
+            text="Live Logs",
             text_color="#a34c6f",
-            font=ctk.CTkFont(family="Georgia", size=35, weight="bold"),
+            font=ctk.CTkFont(family="Georgia", size=24, weight="bold"),
         ).pack(anchor="w", padx=16, pady=(10, 8))
 
         self.logs = ctk.CTkTextbox(
@@ -743,7 +743,7 @@ class DownloaderApp:
             border_color="#e4a1bd",
             fg_color="#2a1024",
             text_color="#ffe6f1",
-            font=ctk.CTkFont(family="Consolas", size=23),
+            font=ctk.CTkFont(family="Consolas", size=12),
             wrap="word",
         )
         self.logs.pack(fill="both", expand=True, padx=12, pady=(0, 12))
@@ -756,9 +756,9 @@ class DownloaderApp:
 
         footer = ctk.CTkLabel(
             self.main,
-            text="? Tip: If your release is private, set environment variable YD_GITHUB_TOKEN.",
+            text="Tip: If your release is private, set environment variable YD_GITHUB_TOKEN.",
             text_color="#b35c80",
-            font=ctk.CTkFont(family="Georgia", size=17),
+            font=ctk.CTkFont(family="Georgia", size=14),
         )
         footer.pack(fill="x", pady=(4, 10))
 
@@ -953,3 +953,4 @@ class DownloaderApp:
 if __name__ == "__main__":
     app = DownloaderApp()
     app.run()
+

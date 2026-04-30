@@ -1,5 +1,11 @@
 ﻿# Changelog
 
+## v1.2.3 - 2026-04-30
+
+- Refined the pink UI proportions, typography, and spacing to better match the provided target mockup
+- Removed unsupported glyph icons that were rendering as '?' on some systems
+- Kept rounded controls and soft pastel palette while preserving one-file behavior
+
 ## v1.2.2 - 2026-04-30
 
 - Switched UI to CustomTkinter for real rounded corners and softer pink styling
