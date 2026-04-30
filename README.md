@@ -1,6 +1,6 @@
 ﻿# YouTube Downloader v2
 
-Modern Windows GUI YouTube downloader powered by `yt-dlp`, with:
+Modern Windows GUI YouTube downloader (PySide6 + skinned UI) powered by `yt-dlp`, with:
 - automatic app updates from GitHub Releases
 - automatic `yt-dlp.exe` updates
 - automatic `ffmpeg/ffprobe/ffplay` installation if missing

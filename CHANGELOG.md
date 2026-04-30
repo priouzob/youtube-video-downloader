@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## v1.3.0 - 2026-04-30
+
+- Migrated UI from Tk/CustomTkinter to PySide6 (Qt)
+- Switched to exact skin background from `fondia.png`
+- Repositioned controls on top of the skin with fixed pixel layout
+- Kept one-file behavior and download/runtime automation
+
 ## v1.2.3 - 2026-04-30
 
 - Refined the pink UI proportions, typography, and spacing to better match the provided target mockup

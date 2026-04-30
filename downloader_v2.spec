@@ -5,7 +5,7 @@ a = Analysis(
     ['downloader_v2.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets/makima_bg.jpg', 'assets'), ('app_icon.ico', '.')],
+    datas=[('fondia.png', '.'), ('app_icon.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

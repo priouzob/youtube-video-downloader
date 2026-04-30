@@ -13,12 +13,20 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Callable, Optional
 
-import tkinter as tk
-from PIL import Image, ImageEnhance, ImageTk
-import customtkinter as ctk
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QFont, QIcon, QPixmap
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QLineEdit,
+    QPlainTextEdit,
+    QProgressBar,
+    QPushButton,
+    QWidget,
+)
 
 # Embedded app version for one-file mode
-APP_VERSION = "v1.2.3"
+APP_VERSION = "v1.3.0"
 APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
 APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
@@ -515,317 +523,185 @@ def run_download(url: str, log: LogFn, set_progress: ProgressFn) -> int:
     return process.wait()
 
 
-class DownloaderApp:
-    def __init__(self) -> None:
-        ctk.set_appearance_mode("light")
-        ctk.set_default_color_theme("blue")
+class DownloaderWindow(QWidget):
+    DESIGN_W = 1504
+    DESIGN_H = 1046
 
-        self.root = ctk.CTk()
-        self.root.title("YouTube Video Downloader")
-        self.root.geometry("1160x760")
-        self.root.minsize(980, 680)
-        self.root.configure(fg_color="#f6dce6")
-        self._apply_window_icon()
+    def __init__(self) -> None:
+        super().__init__()
 
         self.log_queue: Queue[str] = Queue()
         self.progress_queue: Queue[float] = Queue()
         self.ready = False
         self.downloading = False
 
-        self.url_var = tk.StringVar()
-        self.status_var = tk.StringVar(value="Starting...")
-        self.progress_var = tk.DoubleVar(value=0.0)
+        self.design_w = self.DESIGN_W
+        self.design_h = self.DESIGN_H
+        self._load_background_dimensions()
 
-        self.bg_original: Optional[Image.Image] = None
-        self.bg_photo: Optional[ImageTk.PhotoImage] = None
-        self.hero_photo: Optional[ctk.CTkImage] = None
+        self.scale_x = self.design_w / self.DESIGN_W
+        self.scale_y = self.design_h / self.DESIGN_H
 
-        self._build_ui()
+        self.setWindowTitle("YouTube Video Downloader")
+        self.setFixedSize(self.design_w, self.design_h)
 
-        self.root.after(120, self._flush_queues)
-        self.root.after(260, self._bootstrap_async)
-        self.root.bind("<Configure>", self._on_root_resize)
-
-    def _apply_window_icon(self) -> None:
         icon_path = get_resource_path("app_icon.ico")
-        if not icon_path.exists():
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
+
+        self._build_background()
+        self._build_widgets()
+
+        self.ui_timer = QTimer(self)
+        self.ui_timer.timeout.connect(self._flush_queues)
+        self.ui_timer.start(120)
+
+        QTimer.singleShot(240, self._bootstrap_async)
+
+    def _load_background_dimensions(self) -> None:
+        bg_path = get_resource_path("fondia.png")
+        if not bg_path.exists():
             return
-        try:
-            self.root.iconbitmap(default=str(icon_path))
-        except Exception:
-            pass
+        pix = QPixmap(str(bg_path))
+        if not pix.isNull():
+            self.design_w = pix.width()
+            self.design_h = pix.height()
 
-    def _build_ui(self) -> None:
-        self.bg_label = tk.Label(self.root, bd=0, highlightthickness=0)
-        self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
-        self._prepare_background()
+    def _sx(self, value: float) -> int:
+        return int(round(value * self.scale_x))
 
-        self.main = ctk.CTkFrame(
-            self.root,
-            fg_color="#fff4f8",
-            corner_radius=26,
-            border_width=2,
-            border_color="#eaa3bc",
+    def _sy(self, value: float) -> int:
+        return int(round(value * self.scale_y))
+
+    def _build_background(self) -> None:
+        self.bg_label = QLabel(self)
+        self.bg_label.setGeometry(0, 0, self.design_w, self.design_h)
+
+        bg_path = get_resource_path("fondia.png")
+        if bg_path.exists():
+            pix = QPixmap(str(bg_path))
+            if not pix.isNull():
+                self.bg_label.setPixmap(pix.scaled(self.design_w, self.design_h))
+                return
+
+        # Fallback if background missing
+        self.bg_label.setStyleSheet("background-color: #f3d4e2;")
+
+    def _build_widgets(self) -> None:
+        # URL input
+        self.url_entry = QLineEdit(self)
+        self.url_entry.setPlaceholderText("Paste your YouTube URL here...")
+        self.url_entry.setGeometry(self._sx(130), self._sy(402), self._sx(630), self._sy(62))
+        self.url_entry.setStyleSheet(
+            "QLineEdit {"
+            "background-color: #f3edf0; color: #8a3d64;"
+            "border: 2px solid #de8db0; border-radius: 8px; padding: 10px;"
+            "}"
         )
-        self.main.pack(fill="both", expand=True, padx=14, pady=14)
+        self.url_entry.setFont(QFont("Georgia", 15))
+        self.url_entry.returnPressed.connect(self.on_download)
 
-        title = ctk.CTkLabel(
-            self.main,
-            text="YouTube Video Downloader",
-            text_color="#a43f63",
-            font=ctk.CTkFont(family="Times New Roman", size=34, weight="bold"),
+        # Download button
+        self.download_btn = QPushButton("Download", self)
+        self.download_btn.setGeometry(self._sx(803), self._sy(399), self._sx(151), self._sy(69))
+        self.download_btn.setStyleSheet(
+            "QPushButton {"
+            "background-color: #e58db2; color: #fff6fb;"
+            "border: 2px solid #c9668f; border-radius: 8px;"
+            "font-family: Georgia; font-size: 17px; font-weight: 700;"
+            "}"
+            "QPushButton:hover { background-color: #d6769f; }"
+            "QPushButton:disabled { background-color: #cda0b6; color: #f5dbe8; }"
         )
-        title.pack(pady=(14, 2))
+        self.download_btn.clicked.connect(self.on_download)
 
-        subtitle_wrap = ctk.CTkFrame(
-            self.main,
-            fg_color="#e985ad",
-            corner_radius=22,
-            border_width=1,
-            border_color="#cd5b87",
-            width=440,
-            height=38,
+        # Actions
+        self.open_folder_btn = QPushButton("Open Video Folder", self)
+        self.open_folder_btn.setGeometry(self._sx(122), self._sy(500), self._sx(262), self._sy(64))
+        self.open_folder_btn.setStyleSheet(
+            "QPushButton {"
+            "background-color: #f0d2de; color: #9b3d66;"
+            "border: 2px solid #c98aa8; border-radius: 8px;"
+            "font-family: Georgia; font-size: 16px; font-weight: 700;"
+            "}"
+            "QPushButton:hover { background-color: #e6becf; }"
         )
-        subtitle_wrap.pack_propagate(False)
-        subtitle_wrap.pack()
+        self.open_folder_btn.clicked.connect(self.open_video_folder)
 
-        ctk.CTkLabel(
-            subtitle_wrap,
-            text=f"Version {APP_VERSION} · Smart auto-update · one-file friendly",
-            text_color="#fff3f8",
-            font=ctk.CTkFont(family="Georgia", size=14),
-        ).pack(expand=True)
-
-        content = ctk.CTkFrame(self.main, fg_color="transparent")
-        content.pack(fill="both", expand=True, padx=14, pady=(14, 10))
-
-        left = ctk.CTkFrame(content, fg_color="transparent")
-        left.pack(side="left", fill="both", expand=True)
-
-        right = ctk.CTkFrame(
-            content,
-            fg_color="#f9e3ec",
-            corner_radius=20,
-            border_width=2,
-            border_color="#e4a1bd",
-            width=330,
+        self.check_updates_btn = QPushButton("Check Updates", self)
+        self.check_updates_btn.setGeometry(self._sx(420), self._sy(500), self._sx(238), self._sy(64))
+        self.check_updates_btn.setStyleSheet(
+            "QPushButton {"
+            "background-color: #f0d2de; color: #9b3d66;"
+            "border: 2px solid #c98aa8; border-radius: 8px;"
+            "font-family: Georgia; font-size: 16px; font-weight: 700;"
+            "}"
+            "QPushButton:hover { background-color: #e6becf; }"
+            "QPushButton:disabled { background-color: #ead0db; color: #bb93a8; }"
         )
-        right.pack(side="left", fill="y", padx=(14, 0))
-        right.pack_propagate(False)
+        self.check_updates_btn.clicked.connect(self.check_updates_now)
 
-        url_card = ctk.CTkFrame(
-            left,
-            fg_color="#fdf0f5",
-            corner_radius=20,
-            border_width=2,
-            border_color="#e7b3c8",
-            height=156,
+        # Status
+        self.status_label = QLabel("Starting", self)
+        self.status_label.setGeometry(self._sx(825), self._sy(513), self._sx(160), self._sy(45))
+        self.status_label.setFont(QFont("Georgia", 18, QFont.Weight.Bold))
+        self.status_label.setStyleSheet("color: #9f426a; background: transparent;")
+
+        # Progress
+        self.progress = QProgressBar(self)
+        self.progress.setGeometry(self._sx(37), self._sy(586), self._sx(961), self._sy(20))
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress.setTextVisible(False)
+        self.progress.setStyleSheet(
+            "QProgressBar {"
+            "background-color: #f0c9db; border: 0px; border-radius: 7px;"
+            "}"
+            "QProgressBar::chunk {"
+            "background-color: #e885ab; border-radius: 7px;"
+            "}"
         )
-        url_card.pack(fill="x")
-        url_card.pack_propagate(False)
 
-        ctk.CTkLabel(
-            url_card,
-            text="YouTube URL",
-            text_color="#a34c6f",
-            font=ctk.CTkFont(family="Georgia", size=24, weight="bold"),
-        ).pack(anchor="w", padx=22, pady=(14, 8))
-
-        row = ctk.CTkFrame(url_card, fg_color="transparent")
-        row.pack(fill="x", padx=18)
-
-        self.url_entry = ctk.CTkEntry(
-            row,
-            textvariable=self.url_var,
-            placeholder_text="Paste your YouTube URL here...",
-            fg_color="#fff8fb",
-            border_color="#e58dad",
-            text_color="#6b2f4a",
-            placeholder_text_color="#bb7d99",
-            corner_radius=16,
-            height=54,
-            font=ctk.CTkFont(family="Georgia", size=16),
+        # Logs
+        self.logs = QPlainTextEdit(self)
+        self.logs.setGeometry(self._sx(69), self._sy(712), self._sx(887), self._sy(223))
+        self.logs.setReadOnly(True)
+        self.logs.setStyleSheet(
+            "QPlainTextEdit {"
+            "background-color: #37132e; color: #fff0f7;"
+            "border: 2px solid #c98aa8; border-radius: 14px;"
+            "padding: 8px; font-family: Consolas; font-size: 16px;"
+            "}"
+            "QScrollBar:vertical {"
+            "background: #f0d2de; width: 12px; margin: 12px 0 12px 0;"
+            "border-radius: 6px;"
+            "}"
+            "QScrollBar::handle:vertical {"
+            "background: #d978a0; min-height: 30px; border-radius: 6px;"
+            "}"
         )
-        self.url_entry.pack(side="left", fill="x", expand=True, padx=(0, 12))
-        self.url_entry.bind("<Return>", lambda _e: self.on_download())
-
-        self.download_btn = ctk.CTkButton(
-            row,
-            text="Download",
-            command=self.on_download,
-            corner_radius=18,
-            fg_color="#ea84af",
-            hover_color="#d86a98",
-            border_width=2,
-            border_color="#cf5f8b",
-            text_color="#fff7fb",
-            font=ctk.CTkFont(family="Georgia", size=17, weight="bold"),
-            width=250,
-            height=54,
-        )
-        self.download_btn.pack(side="left")
-
-        actions = ctk.CTkFrame(left, fg_color="transparent")
-        actions.pack(fill="x", pady=(12, 6))
-
-        self.open_folder_btn = ctk.CTkButton(
-            actions,
-            text="Open Video Folder",
-            command=self.open_video_folder,
-            corner_radius=16,
-            fg_color="#f7d2e1",
-            hover_color="#edbfd3",
-            border_width=2,
-            border_color="#d893af",
-            text_color="#8d3559",
-            font=ctk.CTkFont(family="Georgia", size=16, weight="bold"),
-            width=270,
-            height=54,
-        )
-        self.open_folder_btn.pack(side="left")
-
-        self.check_updates_btn = ctk.CTkButton(
-            actions,
-            text="Check Updates",
-            command=self.check_updates_now,
-            corner_radius=16,
-            fg_color="#f7d2e1",
-            hover_color="#edbfd3",
-            border_width=2,
-            border_color="#d893af",
-            text_color="#8d3559",
-            font=ctk.CTkFont(family="Georgia", size=16, weight="bold"),
-            width=250,
-            height=54,
-        )
-        self.check_updates_btn.pack(side="left", padx=(12, 0))
-
-        ctk.CTkLabel(
-            actions,
-            textvariable=self.status_var,
-            text_color="#b24f74",
-            font=ctk.CTkFont(family="Georgia", size=18, weight="bold"),
-        ).pack(side="right", padx=(8, 4))
-
-        progress_wrap = ctk.CTkFrame(left, fg_color="transparent")
-        progress_wrap.pack(fill="x", pady=(2, 10))
-
-        self.progress = ctk.CTkProgressBar(
-            progress_wrap,
-            progress_color="#eb75a3",
-            fg_color="#f5c9dc",
-            corner_radius=12,
-            height=14,
-        )
-        self.progress.pack(fill="x")
-        self.progress.set(0.0)
-
-        logs_card = ctk.CTkFrame(
-            left,
-            fg_color="#fdf0f5",
-            corner_radius=20,
-            border_width=2,
-            border_color="#e7b3c8",
-        )
-        logs_card.pack(fill="both", expand=True)
-
-        ctk.CTkLabel(
-            logs_card,
-            text="Live Logs",
-            text_color="#a34c6f",
-            font=ctk.CTkFont(family="Georgia", size=24, weight="bold"),
-        ).pack(anchor="w", padx=16, pady=(10, 8))
-
-        self.logs = ctk.CTkTextbox(
-            logs_card,
-            corner_radius=16,
-            border_width=2,
-            border_color="#e4a1bd",
-            fg_color="#2a1024",
-            text_color="#ffe6f1",
-            font=ctk.CTkFont(family="Consolas", size=12),
-            wrap="word",
-        )
-        self.logs.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        self.logs.configure(state="disabled")
-
-        # Right artwork panel without explicit label text
-        self.art_label = ctk.CTkLabel(right, text="", fg_color="transparent")
-        self.art_label.pack(fill="both", expand=True, padx=10, pady=10)
-        self._refresh_hero_art(300, 560)
-
-        footer = ctk.CTkLabel(
-            self.main,
-            text="Tip: If your release is private, set environment variable YD_GITHUB_TOKEN.",
-            text_color="#b35c80",
-            font=ctk.CTkFont(family="Georgia", size=14),
-        )
-        footer.pack(fill="x", pady=(4, 10))
 
         self._set_controls_enabled(False)
 
-    def _prepare_background(self) -> None:
-        bg_path = get_resource_path("assets/makima_bg.jpg")
-        if not bg_path.exists():
-            self.bg_original = None
-            return
-
-        try:
-            raw = Image.open(bg_path).convert("RGBA")
-            overlay = Image.new("RGBA", raw.size, (255, 160, 200, 95))
-            mixed = Image.alpha_composite(raw, overlay)
-            mixed = ImageEnhance.Brightness(mixed).enhance(0.92)
-            self.bg_original = mixed
-        except Exception:
-            self.bg_original = None
-
-    def _refresh_background(self, width: int, height: int) -> None:
-        if self.bg_original is None or width < 2 or height < 2:
-            return
-        try:
-            resized = self.bg_original.resize((width, height), Image.Resampling.LANCZOS)
-            self.bg_photo = ImageTk.PhotoImage(resized)
-            self.bg_label.configure(image=self.bg_photo)
-        except Exception:
-            pass
-
-    def _refresh_hero_art(self, width: int, height: int) -> None:
-        bg_path = get_resource_path("assets/makima_bg.jpg")
-        if not bg_path.exists() or width < 10 or height < 10:
-            return
-        try:
-            img = Image.open(bg_path).convert("RGBA")
-            overlay = Image.new("RGBA", img.size, (255, 145, 195, 65))
-            mixed = Image.alpha_composite(img, overlay)
-            crop = mixed.resize((width, height), Image.Resampling.LANCZOS)
-            self.hero_photo = ctk.CTkImage(light_image=crop, dark_image=crop, size=(width, height))
-            self.art_label.configure(image=self.hero_photo)
-        except Exception:
-            pass
-
-    def _on_root_resize(self, _event: tk.Event) -> None:
-        self._refresh_background(self.root.winfo_width(), self.root.winfo_height())
-        if hasattr(self, "art_label"):
-            self._refresh_hero_art(self.art_label.winfo_width(), self.art_label.winfo_height())
-
     def _set_controls_enabled(self, enabled: bool) -> None:
-        state = "normal" if enabled else "disabled"
-        self.url_entry.configure(state=state)
-        self.download_btn.configure(state=state)
-        self.check_updates_btn.configure(state=state)
-        self.open_folder_btn.configure(state="normal")
+        self.url_entry.setEnabled(enabled)
+        self.download_btn.setEnabled(enabled)
+        self.check_updates_btn.setEnabled(enabled)
+        self.open_folder_btn.setEnabled(True)
 
     def _append_log(self, msg: str) -> None:
-        self.logs.configure(state="normal")
-        self.logs.insert("end", msg + "\n")
-        self.logs.see("end")
-        self.logs.configure(state="disabled")
+        self.logs.appendPlainText(msg)
+        scrollbar = self.logs.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def log(self, msg: str) -> None:
         self.log_queue.put(msg)
 
     def set_progress(self, value: float) -> None:
         self.progress_queue.put(max(0.0, min(100.0, value)))
+
+    def _set_status(self, value: str) -> None:
+        self.status_label.setText(value)
 
     def _flush_queues(self) -> None:
         try:
@@ -838,12 +714,9 @@ class DownloaderApp:
         try:
             while True:
                 value = self.progress_queue.get_nowait()
-                self.progress_var.set(value)
-                self.progress.set(value / 100.0)
+                self.progress.setValue(int(round(value)))
         except Empty:
             pass
-
-        self.root.after(120, self._flush_queues)
 
     def _bootstrap_async(self) -> None:
         threading.Thread(target=self._bootstrap_worker, daemon=True).start()
@@ -857,41 +730,40 @@ class DownloaderApp:
         check_free_space(runtime_cfg, self.log)
 
         if ensure_app_is_fresh(self.log):
-            self.status_var.set("Updating...")
-            self.root.after(1200, self.root.destroy)
+            self._set_status("Updating")
+            QTimer.singleShot(1200, self.close)
             return
 
         ensure_ytdlp_is_fresh(self.log)
 
         if not YTDLP_PATH.exists():
             self.log("Error: yt-dlp.exe is missing. Download cannot continue.")
-            self.status_var.set("Error")
+            self._set_status("Error")
             return
 
         self.ready = True
-        self.status_var.set("Ready")
+        self._set_status("Ready")
         self.log("Ready. Paste a YouTube URL and click Download.")
-        self.root.after(0, lambda: self._set_controls_enabled(True))
+        QTimer.singleShot(0, lambda: self._set_controls_enabled(True))
 
     def on_download(self) -> None:
         if not self.ready or self.downloading:
             return
 
-        url = self.url_var.get().strip()
+        url = self.url_entry.text().strip()
         if not url:
             self.log("Please paste a YouTube URL first.")
-            self.status_var.set("Missing URL")
+            self._set_status("Missing URL")
             return
 
         if not (url.startswith("http://") or url.startswith("https://")):
             self.log("Invalid URL. It must start with http:// or https://")
-            self.status_var.set("Invalid URL")
+            self._set_status("Invalid URL")
             return
 
         self.downloading = True
-        self.progress_var.set(0.0)
-        self.progress.set(0.0)
-        self.status_var.set("Downloading")
+        self.progress.setValue(0)
+        self._set_status("Downloading")
         self._set_controls_enabled(False)
         self.log("Starting download...")
 
@@ -904,21 +776,20 @@ class DownloaderApp:
             self.downloading = False
             self._set_controls_enabled(True)
             if code == 0:
-                self.progress_var.set(100.0)
-                self.progress.set(1.0)
-                self.status_var.set("Completed")
+                self.progress.setValue(100)
+                self._set_status("Completed")
                 self.log(f"SUCCESS: Video saved to '{VIDEO_DIR}'")
             else:
-                self.status_var.set("Failed")
+                self._set_status("Failed")
                 self.log(f"FAILED: yt-dlp returned exit code {code}")
 
-        self.root.after(0, finish)
+        QTimer.singleShot(0, finish)
 
     def open_video_folder(self) -> None:
         ensure_video_dir()
         try:
             os.startfile(str(VIDEO_DIR))
-            self.status_var.set("Folder opened")
+            self._set_status("Folder opened")
         except Exception:
             self.log(f"Video folder: {VIDEO_DIR}")
 
@@ -927,30 +798,29 @@ class DownloaderApp:
             self.log("Please wait until the current download finishes.")
             return
 
-        self.status_var.set("Checking updates")
+        self._set_status("Checking")
         self._set_controls_enabled(False)
 
         def worker() -> None:
             if ensure_app_is_fresh(self.log):
-                self.root.after(1200, self.root.destroy)
+                QTimer.singleShot(1200, self.close)
                 return
 
             ensure_ytdlp_is_fresh(self.log)
 
             def done() -> None:
-                self.status_var.set("Ready")
+                self._set_status("Ready")
                 self._set_controls_enabled(True)
                 self.log("Update check finished.")
 
-            self.root.after(0, done)
+            QTimer.singleShot(0, done)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def run(self) -> None:
-        self.root.mainloop()
-
 
 if __name__ == "__main__":
-    app = DownloaderApp()
-    app.run()
+    qt_app = QApplication(sys.argv)
+    window = DownloaderWindow()
+    window.show()
+    sys.exit(qt_app.exec())
 

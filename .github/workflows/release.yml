@@ -22,7 +22,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install build dependencies
-        run: python -m pip install --upgrade pip pyinstaller pillow customtkinter
+        run: python -m pip install --upgrade pip pyinstaller pyside6
 
       - name: Build EXE
         run: python -m PyInstaller downloader_v2.spec
