@@ -1,53 +1,51 @@
-﻿# Publication GitHub + Auto-update (app + yt-dlp + ffmpeg)
+﻿# GitHub Releases Auto-Update
 
-## Ce qui est en place
-- Auto-update de `downloader_v2.exe` via GitHub Releases
-- Auto-update de `yt-dlp.exe` (verification quotidienne)
-- Auto-install de `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe` si absents
-- Controle d'espace disque libre avant gros telechargements
-- Workflow GitHub Actions de build/release sur tag `v*.*.*`
+## Current setup
+- App auto-update from GitHub Releases (`youtube-video-downloader.exe`)
+- Daily `yt-dlp.exe` update check with fallback download sources
+- Automatic `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe` install when missing
+- Disk free space check before heavy downloads
+- GitHub Actions workflow to build/release on tags `v*.*.*`
 
-## Fichiers de config
-- `update_config.json` -> auto-update de l'application (GitHub)
-- `runtime_config.json` -> comportement runtime (ffmpeg auto install + espace mini)
-- `version.txt` -> version locale de l'app
+## Config files
+- `update_config.json` -> app auto-update configuration
+- `runtime_config.json` -> runtime behavior (`ffmpeg` auto-install + minimum disk)
+- `version.txt` -> local app version fallback
 
-## Important: limite GitHub
-- GitHub bloque les fichiers > 100 MiB dans un repo Git classique.
-- Donc ne commit pas `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe`.
-- Ton app sait maintenant les recuperer automatiquement au premier lancement.
+## Public repository mode
+No token is required when your repository is public.
 
-## Configuration minimale avant publication
-Dans `update_config.json`:
+`YD_GITHUB_TOKEN` is only needed if:
+- the repository is private, or
+- you want authenticated GitHub API requests.
+
+## Minimal update_config.json
 
 ```json
 {
   "enabled": true,
-  "owner": "TON_OWNER_GITHUB",
-  "repo": "youtubedownloader",
-  "asset_name": "downloader_v2.exe",
+  "owner": "priouzob",
+  "repo": "youtube-video-downloader",
+  "asset_name": "youtube-video-downloader.exe",
   "auto_apply": true,
   "check_interval": "daily"
 }
 ```
 
-## Publier une version
-1. Commit/push du repo
-2. Creer un tag (ex: `v1.0.0`)
-3. Push du tag
+## Release flow
+1. Commit and push to `master`
+2. Create a semantic version tag (example: `v1.4.0`)
+3. Push the tag
+4. GitHub Actions builds and publishes the release asset
 
-Le workflow construit l'exe et publie la release avec:
-- `downloader_v2.exe`
-- `version.txt`
-- `update_config.json`
+Workflow: `.github/workflows/release.yml`
 
-## Ce que l'utilisateur final doit avoir
-Minimum:
-- `downloader_v2.exe`
-- `version.txt`
-- `update_config.json`
-- `runtime_config.json`
-- dossier `video/`
+## End-user requirements
+End users only need:
+- `youtube-video-downloader.exe`
 
-Optionnel:
-- `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe` (sinon auto-download au lancement)
+Everything else is handled automatically by the app at runtime.
+
+## Note about large binaries
+Do not commit FFmpeg binaries to Git (GitHub blocks files >100 MiB).
+The app already downloads/installs them automatically when needed.

@@ -24,7 +24,8 @@ When users run only `youtube-video-downloader.exe`, the app will:
 - download/install `ffmpeg.exe`, `ffprobe.exe`, `ffplay.exe` if missing
 - check app updates from GitHub Releases
 
-If your release repo is private, set `YD_GITHUB_TOKEN` in the environment so the app can read private releases.
+For public repositories, no token is required.
+If you ever switch back to private releases, set `YD_GITHUB_TOKEN` in the environment.
 
 ## Optional local overrides
 

@@ -5,7 +5,7 @@ a = Analysis(
     ['downloader_v2.py'],
     pathex=[],
     binaries=[],
-    datas=[('fondia.png', '.'), ('app_icon.ico', '.')],
+    datas=[('app_icon.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
