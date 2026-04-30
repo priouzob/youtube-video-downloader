@@ -1,7 +1,7 @@
 ﻿{
-  "enabled": false,
-  "owner": "REPLACE_WITH_GITHUB_OWNER",
-  "repo": "REPLACE_WITH_REPO_NAME",
+  "enabled": true,
+  "owner": "priouzob",
+  "repo": "youtubedownloader",
   "asset_name": "downloader_v2.exe",
   "auto_apply": true,
   "check_interval": "daily"
