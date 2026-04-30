@@ -1,0 +1,34 @@
+﻿name: Bug report
+description: Signaler un bug sur l'application
+labels: [bug]
+body:
+  - type: textarea
+    id: bug
+    attributes:
+      label: Description
+      description: Decris le bug observe
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Liste les etapes pour reproduire
+      placeholder: |
+        1. Lancer ...
+        2. Coller URL ...
+        3. Voir erreur ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs/erreur
+      description: Colle le message console complet
