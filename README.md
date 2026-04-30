@@ -1,4 +1,4 @@
-﻿# YouTube Downloader v2
+﻿# YouTube Video Downloader 
 
 Modern Windows GUI YouTube downloader (PySide6 + skinned UI) powered by `yt-dlp`, with:
 - automatic app updates from GitHub Releases
