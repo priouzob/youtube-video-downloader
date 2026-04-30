@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## v1.2.1 - 2026-04-30
+
+- Fixed hidden downloader subprocess window during downloads
+- Removed completion/error popup dialogs after download action
+- Improved pink UI styling for clearer theme consistency
+- Added a dedicated artwork panel so background image is clearly visible
+
 ## v1.2.0 - 2026-04-30
 
 - Renamed executable to `youtube-video-downloader.exe`

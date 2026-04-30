@@ -19,7 +19,7 @@ from tkinter.scrolledtext import ScrolledText
 from PIL import Image, ImageEnhance, ImageTk
 
 # Embedded app version for one-file mode
-APP_VERSION = "v1.2.0"
+APP_VERSION = "v1.2.1"
 APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
 APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
@@ -479,6 +479,14 @@ def run_download(url: str, log: LogFn, set_progress: ProgressFn) -> int:
         url,
     ]
 
+    creationflags = 0
+    startupinfo = None
+    if os.name == "nt":
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -487,6 +495,8 @@ def run_download(url: str, log: LogFn, set_progress: ProgressFn) -> int:
         encoding="utf-8",
         errors="replace",
         bufsize=1,
+        creationflags=creationflags,
+        startupinfo=startupinfo,
     )
 
     percent_re = re.compile(r"(\d+(?:\.\d+)?)%")
@@ -573,6 +583,18 @@ class DownloaderApp:
 
     def _on_root_resize(self, _event: tk.Event) -> None:
         self._refresh_background(self.root.winfo_width(), self.root.winfo_height())
+        if hasattr(self, "art_label"):
+            self._refresh_artwork(self.art_label.winfo_width(), self.art_label.winfo_height())
+
+    def _refresh_artwork(self, width: int, height: int) -> None:
+        if self.bg_original is None or width < 10 or height < 10:
+            return
+        try:
+            img = self.bg_original.resize((width, height), Image.Resampling.LANCZOS)
+            self.hero_photo = ImageTk.PhotoImage(img)
+            self.art_label.configure(image=self.hero_photo)
+        except Exception:
+            pass
 
     def _build_style(self) -> None:
         style = ttk.Style(self.root)
@@ -599,16 +621,16 @@ class DownloaderApp:
 
         style.configure(
             "Subtle.TButton",
-            foreground="#e5e7eb",
-            background="#1f2937",
+            foreground="#fde7f3",
+            background="#3a1030",
             borderwidth=1,
             padding=(12, 9),
             font=("Segoe UI", 10),
         )
         style.map(
             "Subtle.TButton",
-            background=[("active", "#374151"), ("disabled", "#1f2937")],
-            foreground=[("disabled", "#6b7280")],
+            background=[("active", "#5a194a"), ("disabled", "#2f0d27")],
+            foreground=[("disabled", "#d8b4cf")],
         )
 
         style.configure(
@@ -643,34 +665,44 @@ class DownloaderApp:
             font=("Segoe UI", 10),
         ).pack(anchor="w", padx=22, pady=(4, 14))
 
-        body = tk.Frame(root, bg="#0f0a1a")
+        body = tk.Frame(root, bg="#160a1f")
         body.pack(fill="both", expand=True, padx=18, pady=16)
 
-        url_card = tk.Frame(body, bg="#1f2937", bd=0, highlightthickness=1, highlightbackground="#374151")
+        content = tk.Frame(body, bg="#160a1f")
+        content.pack(fill="both", expand=True)
+
+        left_col = tk.Frame(content, bg="#160a1f")
+        left_col.pack(side="left", fill="both", expand=True)
+
+        right_col = tk.Frame(content, bg="#160a1f", width=290)
+        right_col.pack(side="left", fill="y", padx=(14, 0))
+        right_col.pack_propagate(False)
+
+        url_card = tk.Frame(left_col, bg="#24172e", bd=0, highlightthickness=1, highlightbackground="#7b274f")
         url_card.pack(fill="x")
 
         tk.Label(
             url_card,
             text="YouTube URL",
-            bg="#1f2937",
-            fg="#e5e7eb",
+            bg="#24172e",
+            fg="#ffe4f2",
             font=("Segoe UI", 10, "bold"),
         ).pack(anchor="w", padx=14, pady=(12, 6))
 
-        entry_row = tk.Frame(url_card, bg="#1f2937")
+        entry_row = tk.Frame(url_card, bg="#24172e")
         entry_row.pack(fill="x", padx=12, pady=(0, 12))
 
         self.url_entry = tk.Entry(
             entry_row,
             textvariable=self.url_var,
-            bg="#0b1220",
+            bg="#14081a",
             fg="#f8fafc",
             insertbackground="#f8fafc",
             relief="flat",
             font=("Segoe UI", 11),
             highlightthickness=1,
-            highlightbackground="#334155",
-            highlightcolor="#2563eb",
+            highlightbackground="#7b274f",
+            highlightcolor="#db2777",
         )
         self.url_entry.pack(side="left", fill="x", expand=True, ipady=8)
         self.url_entry.bind("<Return>", lambda _e: self.on_download())
@@ -678,7 +710,7 @@ class DownloaderApp:
         self.download_btn = ttk.Button(entry_row, text="Download", style="Accent.TButton", command=self.on_download)
         self.download_btn.pack(side="left", padx=(10, 0))
 
-        actions = tk.Frame(body, bg="#0f0a1a")
+        actions = tk.Frame(left_col, bg="#160a1f")
         actions.pack(fill="x", pady=(12, 8))
 
         self.open_folder_btn = ttk.Button(actions, text="Open Video Folder", style="Subtle.TButton", command=self.open_video_folder)
@@ -690,12 +722,12 @@ class DownloaderApp:
         tk.Label(
             actions,
             textvariable=self.status_var,
-            bg="#0f0a1a",
-            fg="#f9a8d4",
+            bg="#160a1f",
+            fg="#fda4cf",
             font=("Segoe UI", 10),
         ).pack(side="right")
 
-        progress_wrap = tk.Frame(body, bg="#0f0a1a")
+        progress_wrap = tk.Frame(left_col, bg="#160a1f")
         progress_wrap.pack(fill="x", pady=(0, 10))
 
         self.progress = ttk.Progressbar(
@@ -708,21 +740,21 @@ class DownloaderApp:
         )
         self.progress.pack(fill="x")
 
-        logs_card = tk.Frame(body, bg="#1f2937", bd=0, highlightthickness=1, highlightbackground="#374151")
+        logs_card = tk.Frame(left_col, bg="#24172e", bd=0, highlightthickness=1, highlightbackground="#7b274f")
         logs_card.pack(fill="both", expand=True)
 
         tk.Label(
             logs_card,
             text="Live Logs",
-            bg="#1f2937",
-            fg="#e5e7eb",
+            bg="#24172e",
+            fg="#ffe4f2",
             font=("Segoe UI", 10, "bold"),
         ).pack(anchor="w", padx=14, pady=(12, 6))
 
         self.logs = ScrolledText(
             logs_card,
-            bg="#0b1220",
-            fg="#cbd5e1",
+            bg="#14081a",
+            fg="#ffe6f4",
             insertbackground="#f8fafc",
             relief="flat",
             borderwidth=0,
@@ -733,11 +765,27 @@ class DownloaderApp:
         self.logs.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         self.logs.configure(state="disabled")
 
+        art_card = tk.Frame(right_col, bg="#24172e", bd=0, highlightthickness=1, highlightbackground="#7b274f")
+        art_card.pack(fill="both", expand=True)
+
+        tk.Label(
+            art_card,
+            text="Theme Artwork",
+            bg="#24172e",
+            fg="#ffe4f2",
+            font=("Segoe UI", 10, "bold"),
+        ).pack(anchor="w", padx=12, pady=(12, 8))
+
+        self.art_label = tk.Label(art_card, bg="#120a18", bd=0, highlightthickness=0)
+        self.art_label.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self.hero_photo: Optional[ImageTk.PhotoImage] = None
+        self._refresh_artwork(260, 430)
+
         footer = tk.Label(
             root,
             text="Tip: If your release is private, set environment variable YD_GITHUB_TOKEN.",
-            bg="#0f0a1a",
-            fg="#c4b5fd",
+            bg="#160a1f",
+            fg="#f9a8d4",
             font=("Segoe UI", 9),
         )
         footer.pack(fill="x", padx=18, pady=(0, 10), anchor="w")
@@ -841,11 +889,9 @@ class DownloaderApp:
                 self.progress_var.set(100.0)
                 self.status_var.set("Download complete")
                 self.log(f"SUCCESS: Video saved to '{VIDEO_DIR}'")
-                messagebox.showinfo("Done", "Download completed successfully.")
             else:
                 self.status_var.set("Download failed")
                 self.log(f"FAILED: yt-dlp returned exit code {code}")
-                messagebox.showerror("Download failed", f"yt-dlp returned exit code {code}.")
 
         self.root.after(0, finish)
 
