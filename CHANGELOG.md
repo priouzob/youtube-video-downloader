@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## v1.2.2 - 2026-04-30
+
+- Switched UI to CustomTkinter for real rounded corners and softer pink styling
+- Removed the plain "Theme Artwork" title block for a more natural layout
+- Improved visual hierarchy to match the requested romantic/lace-inspired pink direction
+- Kept no extra popup behavior during downloads
+
 ## v1.2.1 - 2026-04-30
 
 - Fixed hidden downloader subprocess window during downloads

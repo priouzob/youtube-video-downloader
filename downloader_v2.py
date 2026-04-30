@@ -14,9 +14,8 @@ from queue import Empty, Queue
 from typing import Callable, Optional
 
 import tkinter as tk
-from tkinter import messagebox, ttk
-from tkinter.scrolledtext import ScrolledText
 from PIL import Image, ImageEnhance, ImageTk
+import customtkinter as ctk
 
 # Embedded app version for one-file mode
 APP_VERSION = "v1.2.1"
@@ -518,13 +517,15 @@ def run_download(url: str, log: LogFn, set_progress: ProgressFn) -> int:
 
 class DownloaderApp:
     def __init__(self) -> None:
-        self.root = tk.Tk()
+        ctk.set_appearance_mode("light")
+        ctk.set_default_color_theme("blue")
+
+        self.root = ctk.CTk()
         self.root.title("YouTube Video Downloader")
-        self.root.geometry("980x680")
-        self.root.minsize(860, 600)
-        self.root.configure(bg="#0b1020")
+        self.root.geometry("1160x760")
+        self.root.minsize(980, 680)
+        self.root.configure(fg_color="#f6dce6")
         self._apply_window_icon()
-        self._setup_background()
 
         self.log_queue: Queue[str] = Queue()
         self.progress_queue: Queue[float] = Queue()
@@ -535,11 +536,14 @@ class DownloaderApp:
         self.status_var = tk.StringVar(value="Starting...")
         self.progress_var = tk.DoubleVar(value=0.0)
 
-        self._build_style()
+        self.bg_original: Optional[Image.Image] = None
+        self.bg_photo: Optional[ImageTk.PhotoImage] = None
+        self.hero_photo: Optional[ctk.CTkImage] = None
+
         self._build_ui()
 
         self.root.after(120, self._flush_queues)
-        self.root.after(250, self._bootstrap_async)
+        self.root.after(260, self._bootstrap_async)
         self.root.bind("<Configure>", self._on_root_resize)
 
     def _apply_window_icon(self) -> None:
@@ -551,22 +555,226 @@ class DownloaderApp:
         except Exception:
             pass
 
-    def _setup_background(self) -> None:
+    def _build_ui(self) -> None:
         self.bg_label = tk.Label(self.root, bd=0, highlightthickness=0)
         self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
-        self.bg_original: Optional[Image.Image] = None
-        self.bg_photo: Optional[ImageTk.PhotoImage] = None
+        self._prepare_background()
 
+        self.main = ctk.CTkFrame(
+            self.root,
+            fg_color="#fff4f8",
+            corner_radius=26,
+            border_width=2,
+            border_color="#eaa3bc",
+        )
+        self.main.pack(fill="both", expand=True, padx=14, pady=14)
+
+        title = ctk.CTkLabel(
+            self.main,
+            text="YouTube Video Downloader",
+            text_color="#a43f63",
+            font=ctk.CTkFont(family="Times New Roman", size=54, weight="bold"),
+        )
+        title.pack(pady=(14, 2))
+
+        subtitle_wrap = ctk.CTkFrame(
+            self.main,
+            fg_color="#e985ad",
+            corner_radius=22,
+            border_width=1,
+            border_color="#cd5b87",
+            width=440,
+            height=38,
+        )
+        subtitle_wrap.pack_propagate(False)
+        subtitle_wrap.pack()
+
+        ctk.CTkLabel(
+            subtitle_wrap,
+            text=f"Version {APP_VERSION} ? Smart auto-update ? one-file friendly",
+            text_color="#fff3f8",
+            font=ctk.CTkFont(family="Georgia", size=16),
+        ).pack(expand=True)
+
+        content = ctk.CTkFrame(self.main, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=14, pady=(14, 10))
+
+        left = ctk.CTkFrame(content, fg_color="transparent")
+        left.pack(side="left", fill="both", expand=True)
+
+        right = ctk.CTkFrame(
+            content,
+            fg_color="#f9e3ec",
+            corner_radius=20,
+            border_width=2,
+            border_color="#e4a1bd",
+            width=330,
+        )
+        right.pack(side="left", fill="y", padx=(14, 0))
+        right.pack_propagate(False)
+
+        url_card = ctk.CTkFrame(
+            left,
+            fg_color="#fdf0f5",
+            corner_radius=20,
+            border_width=2,
+            border_color="#e7b3c8",
+            height=156,
+        )
+        url_card.pack(fill="x")
+        url_card.pack_propagate(False)
+
+        ctk.CTkLabel(
+            url_card,
+            text="?  YouTube URL",
+            text_color="#a34c6f",
+            font=ctk.CTkFont(family="Georgia", size=34, weight="bold"),
+        ).pack(anchor="w", padx=22, pady=(14, 8))
+
+        row = ctk.CTkFrame(url_card, fg_color="transparent")
+        row.pack(fill="x", padx=18)
+
+        self.url_entry = ctk.CTkEntry(
+            row,
+            textvariable=self.url_var,
+            placeholder_text="Paste your YouTube URL here...",
+            fg_color="#fff8fb",
+            border_color="#e58dad",
+            text_color="#6b2f4a",
+            placeholder_text_color="#bb7d99",
+            corner_radius=16,
+            height=54,
+            font=ctk.CTkFont(family="Georgia", size=23),
+        )
+        self.url_entry.pack(side="left", fill="x", expand=True, padx=(0, 12))
+        self.url_entry.bind("<Return>", lambda _e: self.on_download())
+
+        self.download_btn = ctk.CTkButton(
+            row,
+            text="Download",
+            command=self.on_download,
+            corner_radius=18,
+            fg_color="#ea84af",
+            hover_color="#d86a98",
+            border_width=2,
+            border_color="#cf5f8b",
+            text_color="#fff7fb",
+            font=ctk.CTkFont(family="Georgia", size=31, weight="bold"),
+            width=250,
+            height=54,
+        )
+        self.download_btn.pack(side="left")
+
+        actions = ctk.CTkFrame(left, fg_color="transparent")
+        actions.pack(fill="x", pady=(12, 6))
+
+        self.open_folder_btn = ctk.CTkButton(
+            actions,
+            text="? Open Video Folder",
+            command=self.open_video_folder,
+            corner_radius=16,
+            fg_color="#f7d2e1",
+            hover_color="#edbfd3",
+            border_width=2,
+            border_color="#d893af",
+            text_color="#8d3559",
+            font=ctk.CTkFont(family="Georgia", size=30, weight="bold"),
+            width=270,
+            height=54,
+        )
+        self.open_folder_btn.pack(side="left")
+
+        self.check_updates_btn = ctk.CTkButton(
+            actions,
+            text="? Check Updates",
+            command=self.check_updates_now,
+            corner_radius=16,
+            fg_color="#f7d2e1",
+            hover_color="#edbfd3",
+            border_width=2,
+            border_color="#d893af",
+            text_color="#8d3559",
+            font=ctk.CTkFont(family="Georgia", size=30, weight="bold"),
+            width=250,
+            height=54,
+        )
+        self.check_updates_btn.pack(side="left", padx=(12, 0))
+
+        ctk.CTkLabel(
+            actions,
+            textvariable=self.status_var,
+            text_color="#b24f74",
+            font=ctk.CTkFont(family="Georgia", size=37, weight="bold"),
+        ).pack(side="right", padx=(8, 4))
+
+        progress_wrap = ctk.CTkFrame(left, fg_color="transparent")
+        progress_wrap.pack(fill="x", pady=(2, 10))
+
+        self.progress = ctk.CTkProgressBar(
+            progress_wrap,
+            progress_color="#eb75a3",
+            fg_color="#f5c9dc",
+            corner_radius=12,
+            height=14,
+        )
+        self.progress.pack(fill="x")
+        self.progress.set(0.0)
+
+        logs_card = ctk.CTkFrame(
+            left,
+            fg_color="#fdf0f5",
+            corner_radius=20,
+            border_width=2,
+            border_color="#e7b3c8",
+        )
+        logs_card.pack(fill="both", expand=True)
+
+        ctk.CTkLabel(
+            logs_card,
+            text="?  Live Logs",
+            text_color="#a34c6f",
+            font=ctk.CTkFont(family="Georgia", size=35, weight="bold"),
+        ).pack(anchor="w", padx=16, pady=(10, 8))
+
+        self.logs = ctk.CTkTextbox(
+            logs_card,
+            corner_radius=16,
+            border_width=2,
+            border_color="#e4a1bd",
+            fg_color="#2a1024",
+            text_color="#ffe6f1",
+            font=ctk.CTkFont(family="Consolas", size=23),
+            wrap="word",
+        )
+        self.logs.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self.logs.configure(state="disabled")
+
+        # Right artwork panel without explicit label text
+        self.art_label = ctk.CTkLabel(right, text="", fg_color="transparent")
+        self.art_label.pack(fill="both", expand=True, padx=10, pady=10)
+        self._refresh_hero_art(300, 560)
+
+        footer = ctk.CTkLabel(
+            self.main,
+            text="? Tip: If your release is private, set environment variable YD_GITHUB_TOKEN.",
+            text_color="#b35c80",
+            font=ctk.CTkFont(family="Georgia", size=17),
+        )
+        footer.pack(fill="x", pady=(4, 10))
+
+        self._set_controls_enabled(False)
+
+    def _prepare_background(self) -> None:
         bg_path = get_resource_path("assets/makima_bg.jpg")
         if not bg_path.exists():
+            self.bg_original = None
             return
 
         try:
             raw = Image.open(bg_path).convert("RGBA")
-            # Pink cinematic overlay and a slight darkening for UI contrast.
-            overlay = Image.new("RGBA", raw.size, (236, 72, 153, 85))
+            overlay = Image.new("RGBA", raw.size, (255, 160, 200, 95))
             mixed = Image.alpha_composite(raw, overlay)
-            mixed = ImageEnhance.Brightness(mixed).enhance(0.65)
+            mixed = ImageEnhance.Brightness(mixed).enhance(0.92)
             self.bg_original = mixed
         except Exception:
             self.bg_original = None
@@ -581,224 +789,30 @@ class DownloaderApp:
         except Exception:
             pass
 
-    def _on_root_resize(self, _event: tk.Event) -> None:
-        self._refresh_background(self.root.winfo_width(), self.root.winfo_height())
-        if hasattr(self, "art_label"):
-            self._refresh_artwork(self.art_label.winfo_width(), self.art_label.winfo_height())
-
-    def _refresh_artwork(self, width: int, height: int) -> None:
-        if self.bg_original is None or width < 10 or height < 10:
+    def _refresh_hero_art(self, width: int, height: int) -> None:
+        bg_path = get_resource_path("assets/makima_bg.jpg")
+        if not bg_path.exists() or width < 10 or height < 10:
             return
         try:
-            img = self.bg_original.resize((width, height), Image.Resampling.LANCZOS)
-            self.hero_photo = ImageTk.PhotoImage(img)
+            img = Image.open(bg_path).convert("RGBA")
+            overlay = Image.new("RGBA", img.size, (255, 145, 195, 65))
+            mixed = Image.alpha_composite(img, overlay)
+            crop = mixed.resize((width, height), Image.Resampling.LANCZOS)
+            self.hero_photo = ctk.CTkImage(light_image=crop, dark_image=crop, size=(width, height))
             self.art_label.configure(image=self.hero_photo)
         except Exception:
             pass
 
-    def _build_style(self) -> None:
-        style = ttk.Style(self.root)
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-
-        style.configure(
-            "Accent.TButton",
-            foreground="#ffffff",
-            background="#db2777",
-            borderwidth=0,
-            focusthickness=0,
-            focuscolor="#db2777",
-            padding=(14, 10),
-            font=("Segoe UI", 10, "bold"),
-        )
-        style.map(
-            "Accent.TButton",
-            background=[("active", "#be185d"), ("disabled", "#4b1d35")],
-            foreground=[("disabled", "#f5d0e6")],
-        )
-
-        style.configure(
-            "Subtle.TButton",
-            foreground="#fde7f3",
-            background="#3a1030",
-            borderwidth=1,
-            padding=(12, 9),
-            font=("Segoe UI", 10),
-        )
-        style.map(
-            "Subtle.TButton",
-            background=[("active", "#5a194a"), ("disabled", "#2f0d27")],
-            foreground=[("disabled", "#d8b4cf")],
-        )
-
-        style.configure(
-            "Modern.Horizontal.TProgressbar",
-            troughcolor="#1f2937",
-            bordercolor="#1f2937",
-            background="#ec4899",
-            lightcolor="#ec4899",
-            darkcolor="#ec4899",
-        )
-
-    def _build_ui(self) -> None:
-        root = self.root
-
-        header = tk.Frame(root, bg="#12081f", height=96)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-
-        tk.Label(
-            header,
-            text="YouTube Video Downloader",
-            bg="#12081f",
-            fg="#f8fafc",
-            font=("Segoe UI Semibold", 22),
-        ).pack(anchor="w", padx=20, pady=(18, 0))
-
-        tk.Label(
-            header,
-            text=f"Version {APP_VERSION} - Smart auto-update, one-file friendly",
-            bg="#12081f",
-            fg="#f9a8d4",
-            font=("Segoe UI", 10),
-        ).pack(anchor="w", padx=22, pady=(4, 14))
-
-        body = tk.Frame(root, bg="#160a1f")
-        body.pack(fill="both", expand=True, padx=18, pady=16)
-
-        content = tk.Frame(body, bg="#160a1f")
-        content.pack(fill="both", expand=True)
-
-        left_col = tk.Frame(content, bg="#160a1f")
-        left_col.pack(side="left", fill="both", expand=True)
-
-        right_col = tk.Frame(content, bg="#160a1f", width=290)
-        right_col.pack(side="left", fill="y", padx=(14, 0))
-        right_col.pack_propagate(False)
-
-        url_card = tk.Frame(left_col, bg="#24172e", bd=0, highlightthickness=1, highlightbackground="#7b274f")
-        url_card.pack(fill="x")
-
-        tk.Label(
-            url_card,
-            text="YouTube URL",
-            bg="#24172e",
-            fg="#ffe4f2",
-            font=("Segoe UI", 10, "bold"),
-        ).pack(anchor="w", padx=14, pady=(12, 6))
-
-        entry_row = tk.Frame(url_card, bg="#24172e")
-        entry_row.pack(fill="x", padx=12, pady=(0, 12))
-
-        self.url_entry = tk.Entry(
-            entry_row,
-            textvariable=self.url_var,
-            bg="#14081a",
-            fg="#f8fafc",
-            insertbackground="#f8fafc",
-            relief="flat",
-            font=("Segoe UI", 11),
-            highlightthickness=1,
-            highlightbackground="#7b274f",
-            highlightcolor="#db2777",
-        )
-        self.url_entry.pack(side="left", fill="x", expand=True, ipady=8)
-        self.url_entry.bind("<Return>", lambda _e: self.on_download())
-
-        self.download_btn = ttk.Button(entry_row, text="Download", style="Accent.TButton", command=self.on_download)
-        self.download_btn.pack(side="left", padx=(10, 0))
-
-        actions = tk.Frame(left_col, bg="#160a1f")
-        actions.pack(fill="x", pady=(12, 8))
-
-        self.open_folder_btn = ttk.Button(actions, text="Open Video Folder", style="Subtle.TButton", command=self.open_video_folder)
-        self.open_folder_btn.pack(side="left")
-
-        self.check_updates_btn = ttk.Button(actions, text="Check Updates", style="Subtle.TButton", command=self.check_updates_now)
-        self.check_updates_btn.pack(side="left", padx=(10, 0))
-
-        tk.Label(
-            actions,
-            textvariable=self.status_var,
-            bg="#160a1f",
-            fg="#fda4cf",
-            font=("Segoe UI", 10),
-        ).pack(side="right")
-
-        progress_wrap = tk.Frame(left_col, bg="#160a1f")
-        progress_wrap.pack(fill="x", pady=(0, 10))
-
-        self.progress = ttk.Progressbar(
-            progress_wrap,
-            orient="horizontal",
-            mode="determinate",
-            maximum=100,
-            variable=self.progress_var,
-            style="Modern.Horizontal.TProgressbar",
-        )
-        self.progress.pack(fill="x")
-
-        logs_card = tk.Frame(left_col, bg="#24172e", bd=0, highlightthickness=1, highlightbackground="#7b274f")
-        logs_card.pack(fill="both", expand=True)
-
-        tk.Label(
-            logs_card,
-            text="Live Logs",
-            bg="#24172e",
-            fg="#ffe4f2",
-            font=("Segoe UI", 10, "bold"),
-        ).pack(anchor="w", padx=14, pady=(12, 6))
-
-        self.logs = ScrolledText(
-            logs_card,
-            bg="#14081a",
-            fg="#ffe6f4",
-            insertbackground="#f8fafc",
-            relief="flat",
-            borderwidth=0,
-            font=("Consolas", 10),
-            wrap="word",
-            height=18,
-        )
-        self.logs.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        self.logs.configure(state="disabled")
-
-        art_card = tk.Frame(right_col, bg="#24172e", bd=0, highlightthickness=1, highlightbackground="#7b274f")
-        art_card.pack(fill="both", expand=True)
-
-        tk.Label(
-            art_card,
-            text="Theme Artwork",
-            bg="#24172e",
-            fg="#ffe4f2",
-            font=("Segoe UI", 10, "bold"),
-        ).pack(anchor="w", padx=12, pady=(12, 8))
-
-        self.art_label = tk.Label(art_card, bg="#120a18", bd=0, highlightthickness=0)
-        self.art_label.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        self.hero_photo: Optional[ImageTk.PhotoImage] = None
-        self._refresh_artwork(260, 430)
-
-        footer = tk.Label(
-            root,
-            text="Tip: If your release is private, set environment variable YD_GITHUB_TOKEN.",
-            bg="#160a1f",
-            fg="#f9a8d4",
-            font=("Segoe UI", 9),
-        )
-        footer.pack(fill="x", padx=18, pady=(0, 10), anchor="w")
-
-        self._set_controls_enabled(False)
+    def _on_root_resize(self, _event: tk.Event) -> None:
+        self._refresh_background(self.root.winfo_width(), self.root.winfo_height())
+        if hasattr(self, "art_label"):
+            self._refresh_hero_art(self.art_label.winfo_width(), self.art_label.winfo_height())
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
         self.url_entry.configure(state=state)
         self.download_btn.configure(state=state)
         self.check_updates_btn.configure(state=state)
-
-        # Keep folder button always enabled so user can inspect output anytime
         self.open_folder_btn.configure(state="normal")
 
     def _append_log(self, msg: str) -> None:
@@ -825,6 +839,7 @@ class DownloaderApp:
             while True:
                 value = self.progress_queue.get_nowait()
                 self.progress_var.set(value)
+                self.progress.set(value / 100.0)
         except Empty:
             pass
 
@@ -842,7 +857,7 @@ class DownloaderApp:
         check_free_space(runtime_cfg, self.log)
 
         if ensure_app_is_fresh(self.log):
-            self.status_var.set("Updating app...")
+            self.status_var.set("Updating...")
             self.root.after(1200, self.root.destroy)
             return
 
@@ -850,7 +865,7 @@ class DownloaderApp:
 
         if not YTDLP_PATH.exists():
             self.log("Error: yt-dlp.exe is missing. Download cannot continue.")
-            self.status_var.set("Initialization failed")
+            self.status_var.set("Error")
             return
 
         self.ready = True
@@ -864,16 +879,19 @@ class DownloaderApp:
 
         url = self.url_var.get().strip()
         if not url:
-            messagebox.showwarning("Missing URL", "Please paste a YouTube URL first.")
+            self.log("Please paste a YouTube URL first.")
+            self.status_var.set("Missing URL")
             return
 
         if not (url.startswith("http://") or url.startswith("https://")):
-            messagebox.showwarning("Invalid URL", "Please provide a valid URL starting with http:// or https://")
+            self.log("Invalid URL. It must start with http:// or https://")
+            self.status_var.set("Invalid URL")
             return
 
         self.downloading = True
         self.progress_var.set(0.0)
-        self.status_var.set("Downloading...")
+        self.progress.set(0.0)
+        self.status_var.set("Downloading")
         self._set_controls_enabled(False)
         self.log("Starting download...")
 
@@ -887,10 +905,11 @@ class DownloaderApp:
             self._set_controls_enabled(True)
             if code == 0:
                 self.progress_var.set(100.0)
-                self.status_var.set("Download complete")
+                self.progress.set(1.0)
+                self.status_var.set("Completed")
                 self.log(f"SUCCESS: Video saved to '{VIDEO_DIR}'")
             else:
-                self.status_var.set("Download failed")
+                self.status_var.set("Failed")
                 self.log(f"FAILED: yt-dlp returned exit code {code}")
 
         self.root.after(0, finish)
@@ -899,21 +918,23 @@ class DownloaderApp:
         ensure_video_dir()
         try:
             os.startfile(str(VIDEO_DIR))
+            self.status_var.set("Folder opened")
         except Exception:
-            messagebox.showinfo("Output Folder", f"Video folder: {VIDEO_DIR}")
+            self.log(f"Video folder: {VIDEO_DIR}")
 
     def check_updates_now(self) -> None:
         if self.downloading:
-            messagebox.showinfo("Busy", "Please wait until current download finishes.")
+            self.log("Please wait until the current download finishes.")
             return
 
-        self.status_var.set("Checking updates...")
+        self.status_var.set("Checking updates")
         self._set_controls_enabled(False)
 
         def worker() -> None:
             if ensure_app_is_fresh(self.log):
                 self.root.after(1200, self.root.destroy)
                 return
+
             ensure_ytdlp_is_fresh(self.log)
 
             def done() -> None:
