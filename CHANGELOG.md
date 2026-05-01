@@ -1,5 +1,13 @@
 ﻿# Changelog
 
+## v1.3.3 - 2026-05-01
+
+- Hardened download/update pipeline with trusted HTTPS host allowlist
+- Added redirect host validation and max download size limits
+- Added binary validation for downloaded EXE files (MZ header + minimum size)
+- Enforced validation for app self-update executable and FFmpeg/yt-dlp binaries
+- Improved runtime readiness checks so Ready appears only when dependencies are installed
+
 ## v1.3.2 - 2026-05-01
 
 - Added SSL fallback mode for VM environments with broken certificate stores
@@ -68,3 +76,4 @@
 - FFmpeg auto-install if binaries are missing
 - Free disk space check before downloads
 - GitHub Actions release workflow (`v*.*.*` tags)
+

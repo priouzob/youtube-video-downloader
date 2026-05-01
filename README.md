@@ -5,7 +5,7 @@ Modern Windows GUI YouTube downloader (PySide6 + skinned UI) powered by `yt-dlp`
 - automatic `yt-dlp.exe` updates
 - automatic `ffmpeg/ffprobe/ffplay` installation if missing
 - downloads saved to `video/`
-- custom pink-themed interface with integrated background artwork
+- custom modern pink-themed interface
 
 ## Quick Start (End Users)
 

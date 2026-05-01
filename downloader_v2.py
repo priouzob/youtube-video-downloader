@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import datetime
@@ -31,7 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 # Embedded app version for one-file mode
-APP_VERSION = "v1.3.2"
+APP_VERSION = "v1.3.3"
 APP_VERSION_FILE = "version.txt"  # optional fallback
 APP_UPDATE_STAMP_FILE = ".app-last-update-check.txt"
 APP_UPDATE_CONFIG_FILE = "update_config.json"  # optional override
@@ -47,6 +48,20 @@ YTDLP_CANDIDATE_URLS = (
 )
 YTDLP_EXE_NAME = "yt-dlp.exe"
 YTDLP_UPDATE_STAMP_FILE = ".ytdlp-last-update.txt"
+
+ALLOWED_HTTPS_HOSTS = {
+    "api.github.com",
+    "github.com",
+    "objects.githubusercontent.com",
+    "github-releases.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+    "raw.githubusercontent.com",
+    "www.gyan.dev",
+    "gyan.dev",
+}
+
+MIN_EXE_SIZE_BYTES = 200 * 1024
+MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024
 
 LogFn = Callable[[str], None]
 ProgressFn = Callable[[float], None]
@@ -77,11 +92,41 @@ def get_resource_path(relative_path: str) -> Path:
     return BASE_DIR / relative_path
 
 
+def _normalize_host(host: str) -> str:
+    return host.strip().lower().rstrip(".")
+
+
+def is_trusted_https_url(url: str) -> bool:
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme.lower() != "https":
+        return False
+    host = _normalize_host(parsed.hostname or "")
+    if not host:
+        return False
+    if host in ALLOWED_HTTPS_HOSTS:
+        return True
+    return any(host.endswith("." + trusted) for trusted in ALLOWED_HTTPS_HOSTS)
+
+
+def has_valid_pe_header(path: Path, min_size_bytes: int = MIN_EXE_SIZE_BYTES) -> bool:
+    try:
+        if not path.exists() or path.stat().st_size < min_size_bytes:
+            return False
+        with open(path, "rb") as f:
+            sig = f.read(2)
+        return sig == b"MZ"
+    except OSError:
+        return False
+
+
 def load_custom_fonts() -> dict[str, str]:
     # Default serif stack if no custom font is bundled.
     families = {
-        "ui": "Georgia",
-        "mono": "Consolas",
+        "ui": "Segoe UI",
+        "mono": "Cascadia Mono",
     }
 
     font_roots = [get_resource_path("assets/fonts")]
@@ -211,6 +256,8 @@ def is_version_newer(remote: str, local: str) -> bool:
 
 def fetch_latest_release(owner: str, repo: str, timeout_seconds: int = 15) -> Optional[dict]:
     url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    if not is_trusted_https_url(url):
+        return None
     headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "youtube-downloader-updater",
@@ -255,7 +302,7 @@ def pick_release_asset_url(release_data: dict, expected_asset_name: str) -> Opti
             continue
         if asset.get("name") == expected_asset_name:
             url = asset.get("browser_download_url")
-            if isinstance(url, str) and url.strip():
+            if isinstance(url, str) and url.strip() and is_trusted_https_url(url):
                 return url
 
     for asset in assets:
@@ -264,7 +311,7 @@ def pick_release_asset_url(release_data: dict, expected_asset_name: str) -> Opti
         name = str(asset.get("name", ""))
         if name.lower().endswith(".exe"):
             url = asset.get("browser_download_url")
-            if isinstance(url, str) and url.strip():
+            if isinstance(url, str) and url.strip() and is_trusted_https_url(url):
                 return url
 
     return None
@@ -278,12 +325,27 @@ def download_file(url: str, output_path: Path, timeout_seconds: int = 30) -> boo
 def download_file_with_error(
     url: str, output_path: Path, timeout_seconds: int = 30
 ) -> tuple[bool, str]:
+    if not is_trusted_https_url(url):
+        return False, "blocked_untrusted_url"
+
     temp_path = output_path.with_suffix(output_path.suffix + ".tmp")
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+            final_url = str(response.geturl() or "")
+            if not is_trusted_https_url(final_url):
+                raise urllib.error.URLError("blocked_untrusted_redirect")
+            content_length = response.headers.get("Content-Length")
+            if content_length:
+                try:
+                    if int(content_length) > MAX_DOWNLOAD_BYTES:
+                        raise urllib.error.URLError("download_too_large")
+                except ValueError:
+                    pass
             data = response.read()
+            if len(data) > MAX_DOWNLOAD_BYTES:
+                raise urllib.error.URLError("download_too_large")
 
         with open(temp_path, "wb") as f:
             f.write(data)
@@ -297,7 +359,19 @@ def download_file_with_error(
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
                 insecure_ctx = ssl._create_unverified_context()
                 with urllib.request.urlopen(req, timeout=timeout_seconds, context=insecure_ctx) as response:
+                    final_url = str(response.geturl() or "")
+                    if not is_trusted_https_url(final_url):
+                        raise urllib.error.URLError("blocked_untrusted_redirect")
+                    content_length = response.headers.get("Content-Length")
+                    if content_length:
+                        try:
+                            if int(content_length) > MAX_DOWNLOAD_BYTES:
+                                raise urllib.error.URLError("download_too_large")
+                        except ValueError:
+                            pass
                     data = response.read()
+                    if len(data) > MAX_DOWNLOAD_BYTES:
+                        raise urllib.error.URLError("download_too_large")
 
                 with open(temp_path, "wb") as f:
                     f.write(data)
@@ -340,9 +414,12 @@ def download_ytdlp_binary(log: LogFn) -> bool:
                                 shutil.copyfileobj(src, dst)
                             extracted = True
                             break
-                if extracted:
+                if extracted and has_valid_pe_header(YTDLP_PATH):
                     return True
-                log("ZIP source downloaded but yt-dlp.exe not found inside archive.")
+                if extracted:
+                    log("ZIP source extracted yt-dlp.exe, but binary validation failed.")
+                else:
+                    log("ZIP source downloaded but yt-dlp.exe not found inside archive.")
             except (OSError, zipfile.BadZipFile) as exc:
                 log(f"ZIP source invalid: {exc}")
             finally:
@@ -355,6 +432,13 @@ def download_ytdlp_binary(log: LogFn) -> bool:
 
         ok, err = download_file_with_error(url, YTDLP_PATH, timeout_seconds=90)
         if ok:
+            if not has_valid_pe_header(YTDLP_PATH):
+                log("Downloaded yt-dlp.exe failed binary validation.")
+                try:
+                    YTDLP_PATH.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                continue
             if err == "insecure_tls_fallback":
                 log("Warning: SSL verification failed, insecure TLS fallback was used for this source.")
             return True
@@ -392,7 +476,7 @@ def install_ffmpeg_binaries(bundle_url: str, log: LogFn) -> bool:
                     out = BASE_DIR / name
                     with archive.open(info, "r") as src, open(out, "wb") as dst:
                         shutil.copyfileobj(src, dst)
-                    target_names[name] = True
+                    target_names[name] = has_valid_pe_header(out)
     except (OSError, zipfile.BadZipFile):
         log("Invalid or corrupted FFmpeg archive.")
         return False
@@ -464,9 +548,22 @@ def prepare_and_launch_self_update(new_tag: str, asset_url: str, log: LogFn) -> 
     new_exe_path = BASE_DIR / f"{Path(current_exe).stem}.new.exe"
     new_version_path = BASE_DIR / "version.new.txt"
 
-    ok = download_file(asset_url, new_exe_path)
+    if not is_trusted_https_url(asset_url):
+        log("Rejected update source: untrusted URL.")
+        return False
+
+    ok, err = download_file_with_error(asset_url, new_exe_path)
     if not ok:
         log("Failed to download updated executable.")
+        if err:
+            log(f"Reason: {err}")
+        return False
+    if not has_valid_pe_header(new_exe_path):
+        log("Updated executable failed binary validation.")
+        try:
+            new_exe_path.unlink(missing_ok=True)
+        except OSError:
+            pass
         return False
 
     try:
@@ -716,7 +813,7 @@ class DownloaderWindow(QWidget):
         title.setFont(QFont(ui_font, 34, QFont.Bold))
         header_layout.addWidget(title)
 
-        subtitle = QLabel("Version v1.3.2 · Smart auto-update · One-file friendly", header)
+        subtitle = QLabel("Version v1.3.3 · Smart auto-update · One-file friendly", header)
         subtitle.setObjectName("subtitlePill")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setFont(QFont(ui_font, 12, QFont.DemiBold))
@@ -731,7 +828,7 @@ class DownloaderWindow(QWidget):
 
         left_col = QVBoxLayout()
         left_col.setSpacing(12)
-        center.addLayout(left_col, 3)
+        center.addLayout(left_col, 1)
 
         url_card = QFrame(self)
         url_card.setObjectName("card")
@@ -778,7 +875,7 @@ class DownloaderWindow(QWidget):
 
         actions.addStretch(1)
 
-        self.status_label = QLabel("Ready", url_card)
+        self.status_label = QLabel("Setup", url_card)
         self.status_label.setObjectName("statusChip")
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setMinimumWidth(130)
@@ -823,51 +920,6 @@ class DownloaderWindow(QWidget):
 
         self._apply_shadow(logs_card)
         left_col.addWidget(logs_card, 1)
-
-        right_card = QFrame(self)
-        right_card.setObjectName("card")
-        right_card.setMinimumWidth(320)
-        right_card.setMaximumWidth(340)
-        right_layout = QVBoxLayout(right_card)
-        right_layout.setContentsMargins(14, 14, 14, 14)
-        right_layout.setSpacing(10)
-
-        right_title = QLabel("Theme Artwork", right_card)
-        right_title.setObjectName("sectionTitleCenter")
-        right_layout.addWidget(right_title)
-
-        art_box = QFrame(right_card)
-        art_box.setObjectName("artBox")
-        art_layout = QVBoxLayout(art_box)
-        art_layout.setContentsMargins(18, 18, 18, 18)
-        art_layout.setSpacing(10)
-
-        avatar = QLabel("♡", art_box)
-        avatar.setObjectName("avatarCircle")
-        avatar.setAlignment(Qt.AlignCenter)
-        avatar.setFixedSize(120, 120)
-        art_layout.addWidget(avatar, 0, Qt.AlignHCenter)
-
-        art_heart = QLabel("♥", art_box)
-        art_heart.setObjectName("artHeart")
-        art_heart.setAlignment(Qt.AlignCenter)
-        art_layout.addWidget(art_heart)
-
-        art_text = QLabel("MODERN\nPINK UI", art_box)
-        art_text.setObjectName("artText")
-        art_text.setAlignment(Qt.AlignCenter)
-        art_layout.addWidget(art_text)
-        art_layout.addStretch(1)
-
-        right_layout.addWidget(art_box, 1)
-
-        right_deco = QLabel("🌸     🎀     🌸", right_card)
-        right_deco.setObjectName("rightDeco")
-        right_deco.setAlignment(Qt.AlignCenter)
-        right_layout.addWidget(right_deco)
-
-        self._apply_shadow(right_card)
-        center.addWidget(right_card)
 
         self.footer_label = QLabel(
             "Tip: Auto-update checks GitHub releases. Keep internet enabled for updates.",
@@ -1146,14 +1198,21 @@ class DownloaderWindow(QWidget):
         check_free_space(runtime_cfg, self.log)
         ensure_ytdlp_is_fresh(self.log)
 
+        ffmpeg_ok = all((BASE_DIR / name).exists() for name in ("ffmpeg.exe", "ffprobe.exe", "ffplay.exe"))
+        if not ffmpeg_ok:
+            self.log("Error: FFmpeg is still missing after setup attempt.")
+            self.post_event("status", "Missing FFmpeg")
+            self.post_event("ready", False)
+            return False
+
         if not YTDLP_PATH.exists():
             self.log("Error: yt-dlp.exe is missing. Download cannot continue.")
             self.post_event("status", "Error")
             self.post_event("ready", False)
             return False
 
-        self.post_event("status", "Ready")
         self.post_event("ready", True)
+        self.post_event("status", "Ready")
         return True
 
     def _bootstrap_worker(self) -> None:
@@ -1242,8 +1301,15 @@ class DownloaderWindow(QWidget):
                 return
 
             ensure_ytdlp_is_fresh(self.log)
-            self.log("Update check finished.")
-            self.post_event("status", "Ready")
+            ffmpeg_ok = all((BASE_DIR / name).exists() for name in ("ffmpeg.exe", "ffprobe.exe", "ffplay.exe"))
+            runtime_ok = ffmpeg_ok and YTDLP_PATH.exists()
+            self.post_event("ready", runtime_ok)
+            if runtime_ok:
+                self.log("Update check finished.")
+                self.post_event("status", "Ready")
+            else:
+                self.log("Update check finished, but runtime dependencies are still missing.")
+                self.post_event("status", "Missing tools")
             self.post_event("downloading", False)
 
         threading.Thread(target=worker, daemon=True).start()
